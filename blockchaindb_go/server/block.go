@@ -1,5 +1,13 @@
 package main
 
+/*
+data structure for a block, need:
+
+1. transformation between json and the structure
+2. calculate the current hash value
+3. solve for Nonce
+*/
+
 import {
     "../hash"
     pb "../protobuf/go"
@@ -12,7 +20,7 @@ type Transaction struct{
     FromID string
     ToID string
     Value int
-    MiningFee string
+    MiningFee int
     UUID string
 }
 
@@ -24,10 +32,12 @@ type Block struct{
     Nonce string
 
     Depth int //Depth of the block
+
+    MyHash string
 }
 
 func (b *Block) CheckHash(data string)bool{
-    bytes := hash.GetHashBytes()
+    bytes := hash.GetHashBytes(data)
     return bytes[0] == 0 && bytes[1] == 0 && bytes[2] == 0 && bytes[3] == 0 && bytes[4] == 0
 } 
 
@@ -43,7 +53,7 @@ func (b *Block) MarshalToString()(string,error){
     return jsonpb.MarshalToString(block), nil
 }
 
-func (b *Block) Unmarshal(data string)error{
+func (b *Block) Unmarshal(data *string)error{
     block := new(pb.Block)
     err = jsonpb.UnmarshalString(data, block)
 
