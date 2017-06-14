@@ -15,6 +15,11 @@ import {
     "github.com/golang/protobuf/proto"
 }
 
+func CheckHash(data string)bool{
+    bytes := hash.GetHashBytes(data)
+    return bytes[0] == 0 && bytes[1] == 0 && bytes[2] == 0 && bytes[3] == 0 && bytes[4] == 0
+} 
+
 type Transaction struct{
     Type string
     FromID string
@@ -22,6 +27,7 @@ type Transaction struct{
     Value int
     MiningFee int
     UUID string
+    flag int //state of the transaction, sucess(0), pending(1), or not in longest (2)
 }
 
 type Block struct{
@@ -33,13 +39,43 @@ type Block struct{
 
     Depth int //Depth of the block
 
+    //value that should be decided when inserted into our databse
     MyHash string
+    MyHeight int
 }
 
-func (b *Block) CheckHash(data string)bool{
-    bytes := hash.GetHashBytes(data)
-    return bytes[0] == 0 && bytes[1] == 0 && bytes[2] == 0 && bytes[3] == 0 && bytes[4] == 0
-} 
+func MakeNewBlock()*Block{
+}
+
+func (b *Block) GetHeight()int{
+    return b.MyHeight
+}
+
+func (b *Block) SetHeight(height int){
+    b.MyHeight = height
+}
+
+
+func (b *Block) GetHash() (string, error){
+    //Maybe I need parallel this part
+    if b.MyHash != ""{
+        //store the hash value
+        return b.MyHash
+    }
+    data, e := b.MarshalToString()
+    if e== nil{
+        b.MyHash = hash.GetHashString(data)
+    }
+    return b.MyHash, e
+}
+
+func (b *Block) CheckHash() bool{
+    a, e := b.GetHash()
+    if e!=nil{
+        return false
+    }
+    return a[0] == "0" && a[1] == "0" && a[2] == "0" && a[3] == "0" && a[4] == "0"
+}
 
 func (b *Block) MarshalToString()(string,error){
     block := new(pb.Block)

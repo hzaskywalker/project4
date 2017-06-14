@@ -2,6 +2,8 @@ package main
 
 /*
 A database for transfering money
+I maintains the balance here.
+It's not for block.
 
 Question:
     Should we use some persistent data structure for thread safety?
