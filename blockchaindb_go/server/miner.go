@@ -45,8 +45,6 @@ type Miner struct{
     //Cache all block in memory
     //I am not going to solve the bonus
     hash2block  *map[string]*Block
-    //store the current branches string with their height
-    block2Height *map[string]int
     //store the longest chains
     longest *block
 
@@ -212,5 +210,35 @@ func (m *Miner) AddNewBlock(){
     //communicate with the transfer server 
 }
 
+func SolveBlock(block* Block){
+}
+
 func (m *Miner) mainLoop() error{
+    for ;; {
+        block := m.Transfer.GetBlock()
+        var stop, sucess chan int
+        go block.Solve(stop, sucess)
+
+        //do other things..
+        for ;;{
+            //listen to the server
+            select {
+                case is_solved<-sucess:
+                    if is_solved == 1{
+                        if block.GetHeight()>longest.GetHeight(){
+                            //check whether the block is after longest
+                            //push the block
+                            //I don't know when it is successful
+                            m.InsertBlock(block)
+                            m.UpdateLongest(block)
+                        }
+                    }
+                    else{
+                        break
+                    }
+                case <-time.After(time.Second * 0.0001):
+                    fmt.Println("timeout 2")
+            }
+        }
+    }
 }

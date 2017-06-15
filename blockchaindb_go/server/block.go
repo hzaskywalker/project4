@@ -13,12 +13,8 @@ import {
     pb "../protobuf/go"
     "github.com/golang/protobuf/jsonpb"
     "github.com/golang/protobuf/proto"
+    "strings"
 }
-
-func CheckHash(data string)bool{
-    bytes := hash.GetHashBytes(data)
-    return bytes[0] == 0 && bytes[1] == 0 && bytes[2] == 0 && bytes[3] == 0 && bytes[4] == 0
-} 
 
 type Transaction struct{
     Type string
@@ -69,15 +65,27 @@ func (b *Block) GetHash() (string, error){
     return b.MyHash, e
 }
 
+func CheckHashBytes(bytes []byte)bool{
+    //Not sure
+    return bytes[0] == 0 && bytes[1] == 0 && bytes[2] == 0 && bytes[3] == 0 && bytes[4] == 0
+} 
+
+func CheckHashString(a []string)bool{
+    //Not sure
+    return a[0] == "0" && a[1] == "0" && a[2] == "0" && a[3] == "0" && a[4] == "0" && a[5] == "0"
+} 
+
+
 func (b *Block) CheckHash() bool{
     a, e := b.GetHash()
     if e!=nil{
         return false
     }
-    return a[0] == "0" && a[1] == "0" && a[2] == "0" && a[3] == "0" && a[4] == "0"
+    return CheckHashString(a)
 }
 
-func (b *Block) MarshalToString()(string,error){
+func (b *Block) MarshalToString()string{
+    //I don't think there would be error here
     block := new(pb.Block)
     block.BlockID = b.BlockID
     block.PrevHash = b.PrevHash
@@ -104,4 +112,31 @@ func (b *Block) Unmarshal(data *string)error{
         b[idx] = i
     }
     return err, nil
+}
+
+func (b* Block) Solve(stop chan int, solved chan int){
+    b.Nonce = "XXXXXXXX"
+    data := b.MarshalToString()
+    index := strings.index(data, b.Nonce)
+    for i:=0;i<=99999999;++i{
+        if (i&(0x11111))==0{
+            //time out
+            select {
+                case res := <- stop:
+                    if res{
+                        return
+                    }
+                case <-time.After(time.Second * 0.0001):
+                    fmt.Println("timeout 2")
+            }
+        }
+        newNonce := fmt.Sprintf("%08x", i)
+        data[index:index+8] = newNonce
+        hashVal := hash.GetHashString(data)
+        if CheckHashString(hashVal){
+            b.MyHash = hashVal
+            solved <- 1
+            return
+        }
+    }
 }
