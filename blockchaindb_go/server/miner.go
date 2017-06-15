@@ -62,8 +62,8 @@ func newMiner(server_ *Server) Miner{
     return Miner{
         hash2block: make(map[string]*Block),
         database: NewDatabaseEngine(),
-        server: NewServer(),
-        transfers: NewTransferManager()}
+        server: server_,
+        transfers: NewTransferManager(server_)}
 }
 
 func (m *Miner) ServerGetHeight()(int, *Block, bool){

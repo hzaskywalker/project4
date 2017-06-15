@@ -67,15 +67,20 @@ func (b *Block) MarshalToString()string{
     block.PrevHash = b.PrevHash
     block.Nonce = b.Nonce
     block.MinerID = b.MinerID
-    for idx, i := range b.Transactions{
-        block.Transactions[idx] = i
+    block.Transactions = make([]*pb.Transaction, 0)
+    for _, i := range b.Transactions{
+        block.Transactions = append(block.Transactions, i)
     }
-    t, e := (&jsonpb.Marshaler{}).MarshalToString(block)
+    t, e := (&jsonpb.Marshaler{EnumsAsInts: false}).MarshalToString(block)
     if e!=nil{
-        fmt.Print(e)
+        fmt.Println("On block, marshall to string, error: ", e)
         os.Exit(1)
     }
     return t
+}
+
+func (b *Block)String()string {
+    return b.MarshalToString()
 }
 
 func (b *Block) Unmarshal(data string){

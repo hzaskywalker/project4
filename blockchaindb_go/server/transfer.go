@@ -2,7 +2,7 @@ package main
 
 /*
 About transfer:
-    0. the trasnsaction in longest has flag 0, the one in undecided block has flag 2, pending one has flag 1
+    0. the trasnsaction in longest has flag 0, the one in undecided block has flag 2, Pending one has flag 1
     1. Using another thread to store the transaction
     2. Store the new trasaction into a buffer and push it to other server
     3. Verify it with the Miner
@@ -14,7 +14,7 @@ About transfer:
     */
 
 import (
-        //"fmt"
+        "fmt"
         "sync"
         pb "../protobuf/go"
     )
@@ -25,7 +25,7 @@ type TransferServer interface{
 
 
 type Transaction struct{
-    flag int //state of the transaction, sucess(0), pending(1), or not in longest (2)
+    flag int //state of the transaction, sucess(0), Pending(1), or not in longest (2)
     UUID string
     trans *pb.Transaction
 }
@@ -34,60 +34,91 @@ func NewTransaction()*Transaction{
     return &Transaction{}
 }
 
+func (t *Transaction) String()string{
+    return fmt.Sprintf("UUID: %s: From %s, To %s, Value: %d", t.UUID, t.trans.FromID, t.trans.ToID, int(t.trans.Value))
+}
+
+
+
+type TransHouse map[string]*Transaction
+
 type TransferManager struct{
     server TransferServer
 
-    dict map[string] *Transaction
+    dict TransHouse
     lock sync.RWMutex
 
-    channel chan *Transaction
-
     //need something to maintain all transaction with flag = 1
-    pending map[string] *Transaction
-    pendingLock sync.RWMutex
+    //use map to implement set
+    Pending TransHouse
+    PendingLock sync.RWMutex
+
+    PendingNotEmpty *sync.Cond
 }
 
+func (T *TransferManager)GetDictSize()int{
+    return len(T.dict)
+}
 
-func NewTransferManager()*TransferManager{
-    return &TransferManager{server: NewServer()}
+func NewTransferManager(_server TransferServer)*TransferManager{
+    T := &TransferManager{server: _server, 
+        Pending: make(TransHouse),
+        dict: make(TransHouse)}
+    T.PendingNotEmpty = sync.NewCond(&T.PendingLock)
+
+    //go T.Producer() may need add again
+    return T
 }
 
 func (T *TransferManager)SetFlag(t *Transaction, flag int){
-    //set the flag into pending
+    //set the flag into Pending
     if flag == 1 && t.flag!=1 {
-        T.pendingLock.Lock()
-        defer T.pendingLock.Unlock()
+        T.PendingLock.Lock()
+        defer T.PendingLock.Unlock()
 
-        T.pending[t.UUID] = t
+        T.Pending[t.UUID] = t
         t.flag = flag
+
+        T.PendingNotEmpty.Signal()
     }else{
+        if t.flag == 1 && flag!=1{
+            T.PendingLock.Lock()
+            defer T.PendingLock.Unlock()
+
+            delete(T.Pending, t.UUID)
+        }
         t.flag = flag
     }
 }
 
 func (T *TransferManager)GetPending()*Transaction{
-    //return a pending transaction
-    //return nil means there is no pending transaction
+    //flag 0 in longest chain
+    //flag 1 in Pending list
+    //flag in some blocks that not on the longest chain
+
+    //return a Pending transaction
+    //wait if the result is nil
 
     //may need carefully design
-    T.pendingLock.Lock()
-    defer T.pendingLock.Unlock()
+    T.PendingLock.Lock()
+    defer T.PendingLock.Unlock()
 
-    to_delete_list := make([]string,0)
 
-    //I think t == nil at the beginning
+    for ;len(T.Pending)==0;{
+        //fmt.Println("Pending")
+        T.PendingNotEmpty.Wait()
+    }
+
     var t *Transaction
-    for key, val:=range T.pending{
-        if val.flag == 1{
-            t = val
-        }else{
-            to_delete_list = append(to_delete_list, key)
-        }
+    for _, val:=range T.Pending{
+        t = val
+        val.flag = 2
+        break
     }
-    for _, i:=range to_delete_list{
-        delete(T.pending, i)//maybe
+    if t!=nil{
+        delete(T.Pending, t.UUID)
     }
-    t.flag = 2
+    //fmt.Println("get something in Pending list: ", t)
     return t
 }
 
@@ -108,17 +139,19 @@ func (T *TransferManager)WriteTransaction(t *Transaction){
 
 func (T *TransferManager)ReadWriteTransaction(t *Transaction)bool{
     //check whether we have not seen this transaction
-    T.lock.RLock()
-    defer T.lock.RUnlock()
-    t, ok := T.dict[t.UUID]
-    if ok {
-        return false
-    }
+    //seems that Go doesn't support two phase lock..
     T.lock.Lock()
     defer T.lock.Unlock()
 
-    T.SetFlag(t, 1)
+    _, ok := T.dict[t.UUID]
+    if ok {
+        return false
+    }
+    //T.lock.Lock()
+    //defer T.lock.Unlock()
+
     T.dict[t.UUID] = t
+    T.SetFlag(t, 1)
     return true
 }
 
@@ -136,35 +169,32 @@ func (T *TransferManager)UpdateBlockStatus(block *Block, flag int){
         //may insert
         T.dict[t.UUID].trans = t
         T.SetFlag(T.dict[t.UUID], flag)
+        if flag == 3{
+            //delete: for debug
+            delete(T.dict, t.UUID)
+        }
     }
 }
 
 func (T* TransferManager)Producer(){
     for {
-        transaction := T.server.TRANSFER()
-        if T.ReadWriteTransaction(transaction){
-            T.channel <- transaction
-        }
+        t := T.server.TRANSFER()
+        T.ReadWriteTransaction(t)
     }
-}
-
-func (T* TransferManager)Customer()*Transaction{
-    //add the new  
-    transaction := <- T.channel
-    return transaction
 }
 
 func (T *TransferManager)GetBlock(channel chan *Block){
     //get a new block with certain number of transfers
     block := MakeNewBlock()
     for i:=0;i<50;i++{
-        for;;{
-            t := T.GetPending()
-            if t!=nil{
-                block.Transactions = append(block.Transactions, t.trans)
-                break
-            }
-        }
+        t := T.GetPending()
+        block.Transactions = append(block.Transactions, t.trans)
     }
     channel <- block
+}
+
+func (T *TransferManager)GetBlockSync()*Block{
+    channel := make(chan *Block)
+    go T.GetBlock(channel)
+    return <- channel
 }
