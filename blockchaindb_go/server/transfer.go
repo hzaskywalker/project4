@@ -19,6 +19,10 @@ import (
         pb "../protobuf/go"
     )
 
+type TransferServer interface{
+    TRANSFER()*Transaction
+}
+
 
 type Transaction struct{
     flag int //state of the transaction, sucess(0), pending(1), or not in longest (2)
@@ -26,8 +30,12 @@ type Transaction struct{
     trans *pb.Transaction
 }
 
+func NewTransaction()*Transaction{
+    return &Transaction{}
+}
+
 type TransferManager struct{
-    server *Server
+    server TransferServer
 
     dict map[string] *Transaction
     lock sync.RWMutex
@@ -41,7 +49,7 @@ type TransferManager struct{
 
 
 func NewTransferManager()*TransferManager{
-    return &TransferManager{}
+    return &TransferManager{server: NewServer()}
 }
 
 func (T *TransferManager)SetFlag(t *Transaction, flag int){

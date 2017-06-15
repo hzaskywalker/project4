@@ -48,6 +48,9 @@ var id=flag.Int("id",1,"Server's ID, 1<=ID<=NServers")
 
 // Main function, RPC server initialization
 func main() {
+    TestServer()
+    return
+
     flag.Parse()
     IDstr:=fmt.Sprintf("%d",*id)
 
