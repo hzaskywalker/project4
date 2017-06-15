@@ -13,39 +13,51 @@ About transfer:
         However I don't want Miner to handle it.
     */
 
-import {
-        "fmt"
-        "server"
-    }
+import (
+        //"fmt"
+        "sync"
+        pb "../protobuf/go"
+    )
+
+
+type Transaction struct{
+    flag int //state of the transaction, sucess(0), pending(1), or not in longest (2)
+    UUID string
+    trans *pb.Transaction
+}
 
 type TransferManager struct{
     server *Server
 
     dict map[string] *Transaction
-    lock RWMutex
+    lock sync.RWMutex
 
-    channel chan *Transactions
+    channel chan *Transaction
 
     //need something to maintain all transaction with flag = 1
     pending map[string] *Transaction
-    pendingLock RWMutex
+    pendingLock sync.RWMutex
+}
+
+
+func NewTransferManager()*TransferManager{
+    return &TransferManager{}
 }
 
 func (T *TransferManager)SetFlag(t *Transaction, flag int){
     //set the flag into pending
     if flag == 1 && t.flag!=1 {
-        pendingLock.Lock()
-        defer pendingLock.Unlock()
+        T.pendingLock.Lock()
+        defer T.pendingLock.Unlock()
 
         T.pending[t.UUID] = t
         t.flag = flag
-    }
-    else{
+    }else{
         t.flag = flag
     }
 }
 
-func (T *TransferManager)GetPending()*Transactions{
+func (T *TransferManager)GetPending()*Transaction{
     //return a pending transaction
     //return nil means there is no pending transaction
 
@@ -53,19 +65,18 @@ func (T *TransferManager)GetPending()*Transactions{
     T.pendingLock.Lock()
     defer T.pendingLock.Unlock()
 
-    to_delete_list = []string
+    to_delete_list := make([]string,0)
 
     //I think t == nil at the beginning
     var t *Transaction
     for key, val:=range T.pending{
         if val.flag == 1{
             t = val
-        }
-        else{
-            append(to_delete_list, key)
+        }else{
+            to_delete_list = append(to_delete_list, key)
         }
     }
-    for idx, i:=range to_delete_list{
+    for _, i:=range to_delete_list{
         delete(T.pending, i)//maybe
     }
     t.flag = 2
@@ -73,53 +84,54 @@ func (T *TransferManager)GetPending()*Transactions{
 }
 
 func (T *TransferManager)ReadTransaction(UUID string)(*Transaction, bool){
-    lock.RLock()
-    defer lock.RUnlock()
+    T.lock.RLock()
+    defer T.lock.RUnlock()
 
-    t, ok = T.dict[UUID]
+    t, ok := T.dict[UUID]
     return t, ok
 }
 
 func (T *TransferManager)WriteTransaction(t *Transaction){
-    lock.WLock()
-    defer lock.WUnlock()
+    T.lock.Lock()
+    defer T.lock.Unlock()
 
-    T.dict[UUID] = t
+    T.dict[t.UUID] = t
 }
 
 func (T *TransferManager)ReadWriteTransaction(t *Transaction)bool{
     //check whether we have not seen this transaction
-    lock.RLock()
-    defer lock.RUnlock()
-    t, ok = T.dict[UUID]
+    T.lock.RLock()
+    defer T.lock.RUnlock()
+    t, ok := T.dict[t.UUID]
     if ok {
         return false
     }
-    lock.WLock()
-    defer lock.WUnlock()
+    T.lock.Lock()
+    defer T.lock.Unlock()
 
     T.SetFlag(t, 1)
-    T.dict[UUID] = t
+    T.dict[t.UUID] = t
     return true
 }
 
-func (T *TransferManager)UpdateBlockStatus(block *Block, status int)error{
+func (T *TransferManager)UpdateBlockStatus(block *Block, flag int){
     //add or delete the informations in the block
-    lock.WLock()
-    defer lock.WUnlock()
+    T.lock.Lock()
+    defer T.lock.Unlock()
     //change the flag
     //add new transactions into the pool
 
-    for idx, t :=range Block.transactions{
+    for _, t :=range block.Transactions{
         //use UUID to mark the flag of transaction
         //avoid the difference version of flag
-        T.dict[t.UUID] = t
-        T.SetFlag(t, flag)
-    }
 
+        //may insert
+        T.dict[t.UUID].trans = t
+        T.SetFlag(T.dict[t.UUID], flag)
+    }
 }
 
-func (T* Transfer)Producer(){
+func (T* TransferManager)Producer(){
     for {
         transaction := T.server.TRANSFER()
         if T.ReadWriteTransaction(transaction){
@@ -128,22 +140,23 @@ func (T* Transfer)Producer(){
     }
 }
 
-func (T* Transfer)Customer(){
+func (T* TransferManager)Customer()*Transaction{
     //add the new  
     transaction := <- T.channel
+    return transaction
 }
 
-func (T *TransferManager)GetBlock(channel *Block){
+func (T *TransferManager)GetBlock(channel chan *Block){
     //get a new block with certain number of transfers
     block := MakeNewBlock()
-    for i=0;i<50;++i{
+    for i:=0;i<50;i++{
         for;;{
             t := T.GetPending()
             if t!=nil{
+                block.Transactions = append(block.Transactions, t.trans)
                 break
             }
         }
-        append(block.transactions, t)
     }
     channel <- block
 }

@@ -8,79 +8,55 @@ data structure for a block, need:
 3. solve for Nonce
 */
 
-import {
+import (
     "../hash"
     pb "../protobuf/go"
     "github.com/golang/protobuf/jsonpb"
-    "github.com/golang/protobuf/proto"
     "strings"
-}
-
-type Transaction struct{
-    Type string
-    FromID string
-    ToID string
-    Value int
-    MiningFee int
-    UUID string
-    flag int //state of the transaction, sucess(0), pending(1), or not in longest (2)
-}
+    "os"
+    "fmt"
+    "time"
+)
 
 type Block struct{
-    BlockId int
-    PrevHash string
-    Transactions *[]Transaction
-    MinerID string
-    Nonce string
-
-    Depth int //Depth of the block
-
-    //value that should be decided when inserted into our databse
     MyHash string
-    MyHeight int
+    pb.Block
 }
 
 func MakeNewBlock()*Block{
+    return &Block{}
 }
 
 func (b *Block) GetHeight()int{
-    return b.MyHeight
-}
-
-func (b *Block) SetHeight(height int){
-    b.MyHeight = height
+    //need to check ID
+    return int(b.BlockID)
 }
 
 
-func (b *Block) GetHash() (string, error){
+func (b *Block) GetHash()string{
     //Maybe I need parallel this part
     if b.MyHash != ""{
         //store the hash value
         return b.MyHash
     }
-    data, e := b.MarshalToString()
-    if e== nil{
-        b.MyHash = hash.GetHashString(data)
-    }
-    return b.MyHash, e
+    data:= b.MarshalToString()
+    b.MyHash = hash.GetHashString(data)
+    return b.MyHash
 }
 
 func CheckHashBytes(bytes []byte)bool{
     //Not sure
-    return bytes[0] == 0 && bytes[1] == 0 && bytes[2] == 0 && bytes[3] == 0 && bytes[4] == 0
+    return bytes[0] == '0' && bytes[1] == '0' && bytes[2] == '0' && bytes[3] == '0' && bytes[4] == '0'
 } 
 
-func CheckHashString(a []string)bool{
+func CheckHashString(a string)bool{
     //Not sure
-    return a[0] == "0" && a[1] == "0" && a[2] == "0" && a[3] == "0" && a[4] == "0" && a[5] == "0"
+    return a[0] == '0' && a[1] == '0' && a[2] == '0' && a[3] == '0' && a[4] == '0' && a[5] == '0'
 } 
 
 
 func (b *Block) CheckHash() bool{
-    a, e := b.GetHash()
-    if e!=nil{
-        return false
-    }
+    a := b.GetHash()
     return CheckHashString(a)
 }
 
@@ -94,45 +70,56 @@ func (b *Block) MarshalToString()string{
     for idx, i := range b.Transactions{
         block.Transactions[idx] = i
     }
-    return jsonpb.MarshalToString(block), nil
+    t, e := (&jsonpb.Marshaler{}).MarshalToString(block)
+    if e!=nil{
+        fmt.Print(e)
+        os.Exit(1)
+    }
+    return t
 }
 
-func (b *Block) Unmarshal(data *string)error{
+func (b *Block) Unmarshal(data string){
     block := new(pb.Block)
-    err = jsonpb.UnmarshalString(data, block)
+    e := jsonpb.UnmarshalString(data, block)
+    if e!=nil{
+        fmt.Print(e)
+        os.Exit(1)
+    }
 
-    b.Block = block.BlockID
+    b.BlockID = block.BlockID
     b.PrevHash = block.PrevHash
     b.Nonce = block.Nonce
     b.MinerID = block.MinerID
 
     //hard code here
-    b.Transactions = make([]Transaction, 0, 50)
-    for idx, i := range block.Transactions{
-        b[idx] = i
+    for _, i := range block.Transactions{
+        b.Transactions = append(b.Transactions, i)
     }
-    return err, nil
+    return
 }
 
 func (b* Block) Solve(stop chan int, solved chan int){
     b.Nonce = "XXXXXXXX"
     data := b.MarshalToString()
-    index := strings.index(data, b.Nonce)
-    for i:=0;i<=99999999;++i{
+    index := strings.Index(data, b.Nonce)
+    data_list := []byte(data)
+    for i:=0;i<=99999999;i++{
         if (i&(0x11111))==0{
             //time out
             select {
                 case res := <- stop:
-                    if res{
+                    if res==1 {
                         return
                     }
-                case <-time.After(time.Second * 0.0001):
+                case <-time.After(time.Second):
                     fmt.Println("timeout 2")
             }
         }
         newNonce := fmt.Sprintf("%08x", i)
-        data[index:index+8] = newNonce
-        hashVal := hash.GetHashString(data)
+        for j:=0;j<8;j++{
+            data_list[index+j] = newNonce[j]
+        }
+        hashVal := hash.GetHashString(string(data_list))
         if CheckHashString(hashVal){
             b.MyHash = hashVal
             solved <- 1
