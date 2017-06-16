@@ -92,10 +92,10 @@ func (db *DatabaseEngine)UpdateBalance(block *Block, flag int)bool{
         mining_total = mining_total + int(i.MiningFee)
     }
 
-    /*if flag == -1{
+    if flag == -1{
         //When flag == -1, I don't need to check whether it's correct
         db.Add(block.MinerID, -mining_total)
-    }*/
+    }
 
     start, end := 0, num
     if flag == -1{
@@ -119,10 +119,15 @@ func (db *DatabaseEngine)UpdateBalance(block *Block, flag int)bool{
                     break
                 }
             }
+            if flag == -1{
+                db.Add(block.MinerID, mining_total)
+            }
             return false
         }
     }
-    db.Add(block.MinerID, mining_total*flag)
+    if flag == 1{
+        db.Add(block.MinerID, mining_total)
+    }
     return true
 }
 

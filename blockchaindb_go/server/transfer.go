@@ -168,7 +168,11 @@ func (T *TransferManager)UpdateBlockStatus(block *Block, flag int){
         //use UUID to mark the flag of transaction
         //avoid the difference version of flag
 
-        //may insert
+        _, ok := T.dict[t.UUID]
+        if !ok{
+            T.dict[t.UUID] = new(Transaction)
+            T.dict[t.UUID].flag = flag
+        }
         T.dict[t.UUID].trans = t
         T.SetFlag(T.dict[t.UUID], flag)
         if flag == 3{

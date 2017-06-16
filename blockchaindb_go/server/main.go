@@ -22,32 +22,25 @@ type server struct{
 }
 // Database Interface 
 func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetResponse, error) {
-	value, ok := .Get(in.UserID)
-	//1000
-    return &pb.GetResponse{Value: value}, nil
+    return &pb.GetResponse{Value: 1000}, nil
 }
 func (s *server) Transfer(ctx context.Context, in *pb.Transaction) (*pb.BooleanResponse, error) {
-	
     return &pb.BooleanResponse{Success: true}, nil
 }
 func (s *server) Verify(ctx context.Context, in *pb.Transaction) (*pb.VerifyResponse, error) {
-	
     return &pb.VerifyResponse{Result: pb.VerifyResponse_FAILED, BlockHash:"?"}, nil
 }
+
 func (s *server) GetHeight(ctx context.Context, in *pb.Null) (*pb.GetHeightResponse, error) {
-	
     return &pb.GetHeightResponse{Height: 1, LeafHash: "?"}, nil
 }
 func (s *server) GetBlock(ctx context.Context, in *pb.GetBlockRequest) (*pb.JsonBlockString, error) {
-	
     return &pb.JsonBlockString{Json: "{}"}, nil
 }
 func (s *server) PushBlock(ctx context.Context, in *pb.JsonBlockString) (*pb.Null, error) {
-	
     return &pb.Null{}, nil
 }
 func (s *server) PushTransaction(ctx context.Context, in *pb.Transaction) (*pb.Null, error) {
-	
     return &pb.Null{}, nil
 }
 
@@ -59,7 +52,7 @@ func main() {
     HashHardness = 5
     InitHash = "0000000000000000000000000000000000000000000000000000000000000000"
 
-    TestDatabase()
+    TestMiner()
     return
 
     flag.Parse()

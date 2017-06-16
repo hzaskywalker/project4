@@ -59,12 +59,13 @@ type Miner struct{
     server Server
 }
 
-func newMiner(server_ *RealServer) Miner{
-    return Miner{
+func NewMiner(server_ Server) Miner{
+    m := Miner{
         hash2block: make(map[string]*Block),
         database: NewDatabaseEngine(),
-        //server: server_,
+        server: server_,
         transfers: NewTransferManager(server_)}
+    return m
 }
 
 func (m *Miner) ServerGetHeight()(int, *Block, bool){
@@ -174,7 +175,7 @@ func (m *Miner) InsertBlock(block *Block)error{
     //should this been paralleled?
     hash := block.GetHash()
     _, ok := m.Findfather(block)
-    if ok!=nil {
+    if ok == nil {
         m.hash2block[hash] = block
 
         //block.checkHeight(fa.GetHeight()+1)
@@ -209,6 +210,25 @@ func (m *Miner) Verify(t *Transaction)bool{
 
 func (m *Miner) AddNewBlock(){
     //communicate with the transfer server 
+}
+
+func (m *Miner) GetBalance()map[string]int{
+    return m.database.GetBalance()
+}
+
+func (m *Miner) Init(){
+    //I don't 
+    go m.transfers.Producer()
+    ok := false
+    m.hash2block[InitHash] = &Block{MyHash:InitHash}
+    m.longest = m.hash2block[InitHash]
+    m.longest.BlockID = 0
+
+    var newLongest *Block
+    for ;!ok;{
+        _, newLongest, ok = m.ServerGetHeight()
+    }
+    m.InsertBlock(newLongest)//longest would not be calculated
 }
 
 func (m *Miner) mainLoop() error{
