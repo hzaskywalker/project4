@@ -2,8 +2,10 @@ package main
 
 /*
 A database for transfering money
-I maintains the balance here.
+I maintain the balance here.
 It's not for block.
+
+We keep the result of the balance always non-negative after every function
 
 Question:
     Should we use some persistent data structure for thread safety?
@@ -13,14 +15,15 @@ Question:
 
 import (
     "sync"
-    "errors"
+    "fmt"
+    //"errors"
 )
 
 type Balance map[string]int
 
-
 type DatabaseEngine struct {
     balance Balance
+    initValue int
     sync.RWMutex
 }
 
@@ -29,93 +32,93 @@ func checkKey(userId string)bool{
 }
 
 func NewDatabaseEngine()*DatabaseEngine{
-    return &DatabaseEngine{}
+    fmt.Println("NewDatabaseEngine")
+    return &DatabaseEngine{balance: make(Balance), initValue: 1000}
 }
 
-func (db *DatabaseEngine)Transfer(from string, to string, delta int)(int, int, error){
-    if delta < 0{
-        a, b, c := db.Transfer(to, from, -delta)
-        return b, a, c
+func (db *DatabaseEngine)Add(userId string, delta int)bool{
+    val, ok := db.balance[userId]
+    if !ok{
+        val = db.initValue
     }
-    //db.Lock()
-    //defer db.Unlock()
+    val += delta
+    db.balance[userId] = val
+    if val < 0{
+        return false
+    }
+    return true
+}
 
-    from_val, from_ok := db.balance[from]
-    to_val, to_ok := db.balance[to]
-    if !from_ok {
-        from_val = 0
+func (db *DatabaseEngine)Transfer(from string, to string, value int, value2 int)bool{
+    //from pay value
+    //to get value2
+    ok, ok2 := db.Add(from, -value), db.Add(to, value2)
+    if ok && ok2{
+        return true
     }
-    if !to_ok {
-        to_val = 0
-    }
-    if from_val < delta{
-        return from_val, to_val, errors.New("Transfer: Not enough money")
-    }
-    from_val = from_val - delta
-    to_val = to_val + delta
-    db.balance[from] = from_val
-    db.balance[to] = to_val
-    return from_val, to_val, nil
+    db.Add(from, value)
+    db.Add(to, -value2)
+    return false
 }
 
 func (db *DatabaseEngine)Get(userId string)(int, bool){
     val, ok := db.balance[userId]
+    if !ok{
+        val = db.initValue
+        db.balance[userId] = val
+    }
     return val, ok
 }
 
-func (db *DatabaseEngine)Add(userId string, value int)(int, error){
-    val, ok := db.balance[userId]
-    if !ok{
-        return 0, errors.New("No user in Add, should we add the account?")
-    }
-    val += value
-    db.balance[userId] = val
-    return val, nil
-}
-
-func (db *DatabaseEngine)UpdateBalance(block *Block, flag int)error{
+func (db *DatabaseEngine)UpdateBalance(block *Block, flag int)bool{
     //flag is either -1 or 1
     num := len(block.Transactions)
 
     mining_total := 0 
     for _, i:=range block.Transactions{
+        //suppose i.MiningFee >= 0
         mining_total = mining_total + int(i.MiningFee)
     }
 
-    //If minerId not in balance, what would happen?
-    //If the user not in balance, what would happen?
-    //chech Minder here?
-
     if flag == -1{
+        //When flag == -1, I don't need to check whether it's correct
         db.Add(block.MinerID, -mining_total)
     }
-    for i:=0;i<num;i++{
-        j := i
-        if flag<0{
-            j = num-i-1
-        }
-        transaction := block.Transactions[j]
-        _,_,ok := db.Transfer(transaction.FromID, transaction.ToID, int(transaction.Value) * flag)
 
-        if ok != nil{
+    start, end := 0, num
+    if flag == -1{
+        start, end = num-1, -1
+    } 
+    //fmt.Println("start-end:", start, end)
+    for i:=start;i != end;i+=flag{
+        //fmt.Println(i, flag)
+        transaction := block.Transactions[i]
+
+        value, value2 := int(transaction.Value), int(transaction.Value - transaction.MiningFee)
+        ok := db.Transfer(transaction.FromID, transaction.ToID, value*flag, value2*flag)
+
+        if !ok{
             //restore the transaction before
-            for k:=0;k<i;k++{
-                j := k
-                if flag<0 {
-                    j=num-k-1
+            for k:=i-flag;;k-=flag{
+                transaction := block.Transactions[k]
+                value, value2 := int(transaction.Value), int(transaction.Value - transaction.MiningFee)
+                db.Transfer(transaction.FromID, transaction.ToID, -value*flag, -value2*flag)
+                if k == start{
+                    break
                 }
-                transaction := block.Transactions[j]
-                db.Transfer(transaction.FromID, transaction.ToID, int(transaction.Value) * -flag)
             }
             if flag == -1{
-                //This shouldn't happend because flag==-1 if and only if the transaction has succeed before. 
                 db.Add(block.MinerID, mining_total)
             }
-            return errors.New("Block failed, nothing happend.")
+            return false
         }
     }
     if flag == 1{
         db.Add(block.MinerID, mining_total)
     }
-    return nil
+    return true
+}
+
+func (db *DatabaseEngine)GetBalance()Balance{
+    return db.balance
 }

@@ -5,20 +5,14 @@
     */
 package main
 
-type Server struct{
+type Server interface{
+    GetHeight()(int, *Block, bool)
+    GetBlock(hash string)(*Block, bool)
+    TRANSFER()*Transaction
 }
 
-func NewServer()*Server{
-    return &Server{}
+type RealServer struct{
 }
-
-func (s *Server)GetHeight()(int, *Block, bool){
-    return 0, &Block{}, false
-}
-
-func (s *Server)GetBlock(hash string)(*Block, bool){
-    return &Block{}, false
-}
-func (s *Server)TRANSFER()*Transaction{
-    return &Transaction{}
-}
+func (*RealServer)GetHeight()(int, *Block, bool){return 0, &Block{}, false}
+func (*RealServer)GetBlock(hash string)(*Block, bool){return &Block{}, false}
+func (*RealServer)TRANSFER()*Transaction{return &Transaction{}}

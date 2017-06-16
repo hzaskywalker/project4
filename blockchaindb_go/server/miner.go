@@ -55,14 +55,15 @@ type Miner struct{
     transfers *TransferManager
 
     //server handle the consensus with other servers
-    server *Server
+    //this is a interface
+    server Server
 }
 
-func newMiner(server_ *Server) Miner{
+func newMiner(server_ *RealServer) Miner{
     return Miner{
         hash2block: make(map[string]*Block),
         database: NewDatabaseEngine(),
-        server: server_,
+        //server: server_,
         transfers: NewTransferManager(server_)}
 }
 
@@ -208,9 +209,6 @@ func (m *Miner) Verify(t *Transaction)bool{
 
 func (m *Miner) AddNewBlock(){
     //communicate with the transfer server 
-}
-
-func SolveBlock(block* Block){
 }
 
 func (m *Miner) mainLoop() error{

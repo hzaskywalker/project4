@@ -11,6 +11,8 @@ About transfer:
         Otherwise return failed
     5. Miner and Transfer shall maitain consensus about all happened transfer
         However I don't want Miner to handle it.
+    6. We needn't store the transanctions on disk. Suppose program crashed, we can rebuild the Transfer system easily by blocks
+        Just forget anything about the pending one.
     */
 
 import (

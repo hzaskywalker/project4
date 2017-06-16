@@ -2,7 +2,7 @@ package main
 
 import (
     "fmt"
-    "math/rand"
+    //"math/rand"
     "time"
     "sort"
     pb "../protobuf/go"
@@ -24,21 +24,23 @@ func (s *FakeServer)init(n int, initilize int){
     }
 }
 
+func GenTransaction(A string, B string, value int, MiningFee int, UUID string)*Transaction{
+    t:=NewTransaction()
+    t.trans = &pb.Transaction{}
+    t.trans.FromID = A
+    t.trans.ToID = B
+    t.trans.Value = int32(value)
+    t.trans.MiningFee = int32(MiningFee)
+    t.trans.Type = pb.Transaction_Types(5)
+    t.trans.UUID = UUID
+    t.UUID = t.trans.UUID
+    return t
+}
+
 func (s *FakeServer)GenTransfers(start int){
     n := len(s.people_id)
     for i:=0;i<50;i++{
-        t:=NewTransaction()
-        t.trans = &pb.Transaction{}
-        t.trans.FromID = s.people_id[i%n]
-        t.trans.ToID = s.people_id[(i+1)%n]
-        t.trans.Value = int32(rand.Int() % 10)
-        t.trans.Value = int32(i)
-        t.trans.MiningFee = 0
-        t.trans.Type = pb.Transaction_Types(5)
-        t.trans.UUID = fmt.Sprintf("%08x", i + start*234)
-        t.UUID = t.trans.UUID
-
-        s.channel <- t
+        s.channel <- GenTransaction(s.people_id[i%n], s.people_id[(i+1)%n], i, 0, fmt.Sprintf("%08x", i + start*234))
     }
 }
 

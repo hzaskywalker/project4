@@ -48,7 +48,11 @@ var id=flag.Int("id",1,"Server's ID, 1<=ID<=NServers")
 
 // Main function, RPC server initialization
 func main() {
-    TestServer()
+    //set the hardness
+    HashHardness = 5
+    InitHash = "0000000000000000000000000000000000000000000000000000000000000000"
+
+    TestDatabase()
     return
 
     flag.Parse()
