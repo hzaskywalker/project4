@@ -17,7 +17,7 @@ import (
 )
 
 type Balance map[string]int
-
+const init_value = 1000
 
 type DatabaseEngine struct {
     balance Balance
@@ -29,7 +29,7 @@ func checkKey(userId string)bool{
 }
 
 func NewDatabaseEngine()*DatabaseEngine{
-    return &DatabaseEngine{}
+    return &DatabaseEngine{balance: make(map[string]int)}
 }
 
 func (db *DatabaseEngine)Transfer(from string, to string, delta int)(int, int, error){
