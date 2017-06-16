@@ -19,6 +19,7 @@ import (
     "fmt"
     "os"
     "math/rand"
+    "time"
     pb "../protobuf/go"
 )
 
@@ -28,6 +29,8 @@ type MyServer struct{
 
     blocks map[string]*Block
     longest *Block
+
+    TransferSender chan *Transaction
 }
 
 func UpdateBalance(balance map[string]int, block *Block){
@@ -116,6 +119,14 @@ func CompareBalance(A map[string]int, B map[string]int)bool{
     return true
 }
 
+func (s *MyServer) SendTransfer(t *Transaction){
+    s.TransferSender <- t
+}
+
+func (s *MyServer) TRANSFER()*Transaction{
+    return <- s.TransferSender
+}
+
 func (s *MyServer) GenerateNewBlock(hash string, num_trans int, valid bool, startUUID int)*Block{
     /*
         Geerate NewBlocks after the blocks[hash]
@@ -142,7 +153,10 @@ func (s *MyServer) GenerateNewBlock(hash string, num_trans int, valid bool, star
         balance[a] -= value
         balance[b] += value - mining_fee
 
-        Transactions = append(Transactions, GenTransaction(a, b, value, mining_fee, fmt.Sprintf("%08x", i + startUUID)).trans)
+        t := GenTransaction(a, b, value, mining_fee, fmt.Sprintf("%08x", i + startUUID))
+        go s.SendTransfer(t)
+
+        Transactions = append(Transactions, t.trans)
 
         if i==num_trans-1 || i%50 == 49{
             block := MakeNewBlock()
@@ -174,6 +188,7 @@ func (s *MyServer) GenerateNewBlock(hash string, num_trans int, valid bool, star
 func (s *MyServer)init(n int, initilize int, num_trans int){
     s.balance = make(map[string]int)
     s.blocks = make(map[string]*Block)
+    s.TransferSender = make(chan *Transaction)
     for i:=0;i<n;i++{
         s.people_id = append(s.people_id, fmt.Sprintf("%08x", i)) //%x or %d?
     }
@@ -237,7 +252,7 @@ func TestDatabaseEngine(s *MyServer){
             os.Exit(1)
         }
     }
-    //TODO: check the code
+    //TODO: check the code for incorrect block
 }
 
 func TestMiner(){
@@ -251,15 +266,23 @@ func TestMiner(){
     HashHardness = 2
     s := MyServer{}
     fmt.Println("Test Miner")
+    rand.Seed(time.Now().UnixNano())  
 
     num_before := rand.Intn(1000) + 10
     num_later := rand.Intn(1000) + 10
 
     s.init(15, 1000, num_before)
     fmt.Println("Init Server")
+    fmt.Println("longest", s.longest.BlockID, s.longest.GetHash())
 
     miner := NewMiner(&s)
     miner.Init()
+    pending_size_init := miner.GetTransferManager().GetPendingSize()
+    fmt.Println("dict size", miner.GetTransferManager().GetDictSize())
+    fmt.Println("pending_size after init ", pending_size_init)
+    if pending_size_init>0{
+        os.Exit(1)
+    }
 
     //ttt := s.GenerateChain(s.longest.GetHash())
     //fmt.Println(ttt[0])
@@ -280,6 +303,7 @@ func TestMiner(){
     miner.InsertBlock(t)
     if t.BlockID>s.longest.BlockID{
         s.longest = t
+        fmt.Println("switch longest")
     }
 
 
@@ -289,6 +313,24 @@ func TestMiner(){
         os.Exit(1)
     }
     fmt.Println("Miner balance correct after switching a longer chain!")
+
+    //TODO: Check for validation
+    dict_size := miner.GetTransferManager().GetDictSize()
+    pending_size := miner.GetTransferManager().GetPendingSize()
+    longest_trans_num := 0
+    blocks = s.GenerateChain(s.longest.GetHash())
+    for _, b:=range(blocks){
+        longest_trans_num += len(b.Transactions)
+    }
+    pending_gt_num := num_before + num_later - longest_trans_num
+    fmt.Println(longest_trans_num, pending_gt_num, num_before + num_later)
+
+
+    fmt.Println("transfer information", dict_size, pending_size)
+    if pending_size != pending_gt_num{
+        fmt.Println("pending num is wrong")
+        os.Exit(0)
+    }
 }
 
 func TestDatabase(){

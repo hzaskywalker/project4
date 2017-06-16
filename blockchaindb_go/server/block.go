@@ -38,7 +38,7 @@ func (b *Block) GetHeight()int{
 
 func (b *Block) GetHash()string{
     //Maybe I need parallel this part
-    if b.MyHash != "" && false{
+    if b.MyHash != ""{
         //store the hash value
         return b.MyHash
     }

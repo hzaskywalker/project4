@@ -38,6 +38,9 @@ import (
     "errors"
     "fmt"
     "time"
+    "sync"
+    "os"
+    "../hash"
 )
 
 type Miner struct{
@@ -47,9 +50,14 @@ type Miner struct{
     //store the longest chains
     longest *Block
 
+    //We need to store the currentDataBase pointer
+    //Although in most of the time, currentDataBase == longest
+    currentDataBase *Block
+
 
     //database handle the balance of each person
     database *DatabaseEngine
+    balanceLock sync.RWMutex
 
     //transfers handles transactions
     transfers *TransferManager
@@ -65,7 +73,13 @@ func NewMiner(server_ Server) Miner{
         database: NewDatabaseEngine(),
         server: server_,
         transfers: NewTransferManager(server_)}
+
+    go m.transfers.Producer()
     return m
+}
+
+func (m *Miner) GetTransferManager()*TransferManager{
+    return m.transfers
 }
 
 func (m *Miner) ServerGetHeight()(int, *Block, bool){
@@ -73,15 +87,27 @@ func (m *Miner) ServerGetHeight()(int, *Block, bool){
     return m.server.GetHeight()
 }
 
-func (m *Miner) ServerGetBlock(hash string)(*Block, bool){
+func (m *Miner) ServerGetBlock(h string)(*Block, bool){
     //need check validity here or anything before server
-    return m.server.GetBlock(hash)
+
+    //verify that the hash value equal to its real value
+    block, ok := m.server.GetBlock(h)
+    if !ok{
+        return nil, ok
+    }
+    if hash.GetHashString(block.MarshalToString()) != h{
+        fmt.Println("GetBlock's hash is not correct")
+        return nil, false
+    }
+    return block, true
 }
 
 func (m *Miner) GetBlock(hash string)(*Block, bool){
     block, ok := m.hash2block[hash]
-    if ok{
+    if ok && block!=nil{
         return block, ok
+    }else if ok && block==nil{
+        return nil, false
     }
     block2, ok2 := m.ServerGetBlock(hash)
     if ok2 == false{
@@ -94,7 +120,7 @@ func (m *Miner) GetBlock(hash string)(*Block, bool){
 
 func (m *Miner) Findfather(block *Block) (*Block, error){
     fa, ok := m.GetBlock(block.PrevHash)
-    if ok == false{
+    if ok == false || (fa!=nil && fa.BlockID+1!=block.BlockID) || fa == nil{
         return nil, errors.New("No father here")
     }
     return fa, nil
@@ -102,13 +128,17 @@ func (m *Miner) Findfather(block *Block) (*Block, error){
 
 func (m *Miner) LCA(a *Block, b *Block)(*Block, error){
     var e error
+    //fmt.Println("start")
     for ;a.GetHeight()!=b.GetHeight(); {
+        //_, ok:=m.hash2block[b.PrevHash]
+        //fmt.Println("LCA k", a.BlockID, b.BlockID, ok)
         if a.GetHeight() > b.GetHeight(){
             a, e = m.Findfather(a)
         }else{
             b, e = m.Findfather(b)
         }
         if e!=nil{
+            //fmt.Println("error")
             return nil, errors.New("Get error when finding father in lca")
         }
     }
@@ -132,11 +162,16 @@ func (m *Miner) UpdateBalance(block *Block)error{
     //Update the balance to this branch
 
     //Also I need to change the transfer management
-    A:=m.longest
+    //Add lock here
+    m.balanceLock.Lock()
+    defer m.balanceLock.Unlock()
+
+    A:=m.currentDataBase
     lca, e := m.LCA(A, block)
     if e!=nil{
         return e
     }
+    //fmt.Println(m.currentDataBase.BlockID, block.BlockID)
     for ;A!=lca; {
         m.database.UpdateBalance(A, -1)
         m.transfers.UpdateBlockStatus(A, 1)//should all be pendding
@@ -150,9 +185,20 @@ func (m *Miner) UpdateBalance(block *Block)error{
     }
 
     for i:=len(b)-1;i>=0;i--{
-        m.transfers.UpdateBlockStatus(A, 0)//should all be success
-        m.database.UpdateBalance(b[i], 1)
+        if m.database.UpdateBalance(b[i], 1){
+            m.transfers.UpdateBlockStatus(b[i], 0)//should all be success
+        }else{
+            for j:=i+1;j<=len(b)-1;j++{
+                m.database.UpdateBalance(b[i], -1)
+            }
+            //not for sure
+            m.currentDataBase = lca
+            //We may need to mask this block to be nil
+            //so that we would not calc them again?
+            return errors.New("Get error on calculating balance")
+        }
     }
+    m.currentDataBase = block
     return nil
 }
 
@@ -164,6 +210,7 @@ func (m *Miner) UpdateLongest(block *Block)error{
     if m.longest.GetHeight() < block.GetHeight() {
         e := m.UpdateBalance(block)
         if e!=nil{
+            fmt.Println(e)
             return e
         }
         m.longest = block
@@ -172,16 +219,23 @@ func (m *Miner) UpdateLongest(block *Block)error{
 }
 
 func (m *Miner) InsertBlock(block *Block)error{
+    //We need verify something
     //should this been paralleled?
+    //Here we have checked the block
+    //We would only insert the block if it's better than longest
     hash := block.GetHash()
     _, ok := m.Findfather(block)
     if ok == nil {
         m.hash2block[hash] = block
+        e := m.UpdateBalance(block)
 
-        //block.checkHeight(fa.GetHeight()+1)
-        //chech wehther we should update
-        m.UpdateLongest(block)
-        return nil
+        if e == nil{
+            m.UpdateLongest(block)
+            return nil
+        }else{
+            m.hash2block[hash] = nil
+            return errors.New("block balance wrong")
+        }
     }else{
         return errors.New("block's father not found")
     }
@@ -208,12 +262,26 @@ func (m *Miner) Verify(t *Transaction)bool{
     return false
 }
 
-func (m *Miner) AddNewBlock(){
-    //communicate with the transfer server 
+func (m *Miner) GetBalance()map[string]int{
+    //lock currentDataBase
+    if m.currentDataBase != m.longest{
+        m.UpdateBalance(m.longest)
+    }
+    //the result of balance should never be error
+    return m.database.GetBalance()
 }
 
-func (m *Miner) GetBalance()map[string]int{
-    return m.database.GetBalance()
+func (m *Miner) GetBalanceString(hash string)(map[string]int, bool){
+    block, ok := m.GetBlock(hash)
+    if !ok{
+        return nil, false
+    }
+    if block != m.currentDataBase{
+        if m.UpdateBalance(block)==nil{
+            return nil, false
+        }
+    }
+    return m.database.GetBalance(), true
 }
 
 func (m *Miner) Init(){
@@ -222,16 +290,38 @@ func (m *Miner) Init(){
     ok := false
     m.hash2block[InitHash] = &Block{MyHash:InitHash}
     m.longest = m.hash2block[InitHash]
+    m.currentDataBase = m.hash2block[InitHash]
     m.longest.BlockID = 0
 
     var newLongest *Block
     for ;!ok;{
         _, newLongest, ok = m.ServerGetHeight()
     }
-    m.InsertBlock(newLongest)//longest would not be calculated
+    e := m.InsertBlock(newLongest)//longest would not be calculated
+    if e!=nil{
+        fmt.Println(e)
+        os.Exit(1)
+    }
 }
 
 func (m *Miner) mainLoop() error{
+    /*
+        You have only following two thread:
+            1. one for solve hash proble
+            2. one for:
+                1. receiving other's push, save in a buffer of server
+                    if we found it's longer than current, add it and check balance
+                    otherwise we ignore it
+                2. if we don't have a longer block
+                    we keep our balance on longest block
+                    verify new transactions and select block 
+
+                However we want parallel the check and select
+                    which means we will maitain two balance? Sounds good.
+
+                Right now let's forget it
+        */
+
     for ;; {
         var block_channel chan *Block
         go m.transfers.GetBlock(block_channel)

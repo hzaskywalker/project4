@@ -62,6 +62,11 @@ func (T *TransferManager)GetDictSize()int{
     return len(T.dict)
 }
 
+func (T *TransferManager)GetPendingSize()int{
+    //unsafe, only for debug
+    return len(T.Pending)
+}
+
 func NewTransferManager(_server TransferServer)*TransferManager{
     T := &TransferManager{server: _server, 
         Pending: make(TransHouse),
@@ -174,6 +179,7 @@ func (T *TransferManager)UpdateBlockStatus(block *Block, flag int){
             T.dict[t.UUID].flag = flag
         }
         T.dict[t.UUID].trans = t
+        //fmt.Println(t.UUID, flag, len(T.Pending))
         T.SetFlag(T.dict[t.UUID], flag)
         if flag == 3{
             //delete: for debug
