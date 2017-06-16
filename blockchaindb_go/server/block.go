@@ -30,6 +30,16 @@ func MakeNewBlock()*Block{
     return &Block{}
 }
 
+func MakeNewBlockAfter(longest *Block, myid string)*Block{
+    block := MakeNewBlock()
+    block.MinerID = myid
+    block.PrevHash = longest.GetHash()
+    block.BlockID = longest.BlockID + 1
+    block.Transactions = make([]*pb.Transaction, 0)
+    return block
+}
+
+
 func (b *Block) GetHeight()int{
     //need to check ID
     return int(b.BlockID)

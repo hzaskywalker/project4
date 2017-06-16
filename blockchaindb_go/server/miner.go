@@ -304,6 +304,29 @@ func (m *Miner) Init(){
     }
 }
 
+
+func (T *TransferManager)GetPendingByBalance(balance *map[string]int, result chan *Transaction, stop chan int){
+    //should stop by stop
+    T.PendingLock.Lock()
+    defer T.PendingLock.Unlock()
+
+
+    for ;len(T.Pending)==0;{
+        T.PendingNotEmpty.Wait()
+    }
+
+    var t *Transaction
+    for _, val:=range T.Pending{
+        t = val
+        val.flag = 2
+        break
+    }
+    if t!=nil{
+        delete(T.Pending, t.UUID)
+    }
+    return t
+}
+
 func (m *Miner) mainLoop() error{
     /*
         You have only following two thread:
@@ -317,38 +340,57 @@ func (m *Miner) mainLoop() error{
                     verify new transactions and select block 
 
                 However we want parallel the check and select
-                    which means we will maitain two balance? Sounds good.
+                    How about maitaining two balance?
+                    Or just copy it?
 
                 Right now let's forget it
         */
+    get_pending := make(chan *Transaction)
+    stop_pending := make(chan int)
+
+    is_solved := make(chan int)
+
+    server_query := make(chan int) //stands for all serveer query
+
+    currentBlock = MakeNewBlockAfter(m.longest, "MYID")
+    var solvingBlock *Block
+    go m.transfers.GetPendingByBalance(m.GetBalance(), get_pending)
 
     for ;; {
-        var block_channel chan *Block
-        go m.transfers.GetBlock(block_channel)
-
-        block := <- block_channel
-
-        var stop, sucess chan int
-        go block.Solve(stop, sucess)
+        /*
+        In each round, either
+            1. Solve a block
+                or Recieve Put a new Block
+            2. Get a new transaction 
+            */
 
         //do other things..
-        for ;;{
-            //listen to the server
-            select {
-                case is_solved := <-sucess:
-                    if is_solved == 1{
-                        if block.GetHeight()>m.longest.GetHeight(){
-                            //check whether the block is after longest
-                            //push the block
-                            //I don't know when it is successful
-                            m.InsertBlock(block)
-                        }
-                    }else{
-                        break
-                    }
-                case <-time.After(time.Second):
-                    fmt.Println("timeout 2")
+
+        var newBlocks *Block
+        newBlocks = nil
+
+        select {
+            case is_solved := <- success:
+                if is_solved == 1{
+                    newBlocks = solvingBlock
+                    solvingBlock = nil
+                }
+            case t := <- get_pending{
+                //update balance by t
+                go m.transfers.GetPendingByBalance(m.GetBalance(), get_pending, stop_pending)
             }
+            case s := <-server_query{
+                //anser the server query
+            }
+            case <-time.After(time.Second):
+                //decide wether to start a new block or any other strategy
+                //or do nothing
+        }
+
+        if newBlocks{
+            //add newBlocks
+            //return balance to longest
+            //then check for new putting block if it's blockid is heigher?
         }
     }
 }
