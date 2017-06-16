@@ -7,6 +7,8 @@ It's not for block.
 
 We keep the result of the balance always non-negative after every function
 
+need lock?
+
 Question:
     Should we use some persistent data structure for thread safety?
     Now we only mining one block at the same time which means that there is no multi thread problem.
@@ -37,12 +39,15 @@ func NewDatabaseEngine()*DatabaseEngine{
 }
 
 func (db *DatabaseEngine)Add(userId string, delta int)bool{
+	if !checkKey(userId){
+		return false
+	}
     val, ok := db.balance[userId]
     if !ok{
         val = db.initValue
     }
-    val += delta
-    db.balance[userId] = val
+	val += delta
+	db.balance[userId] = val
     if val < 0{
         return false
     }
@@ -62,10 +67,14 @@ func (db *DatabaseEngine)Transfer(from string, to string, value int, value2 int)
 }
 
 func (db *DatabaseEngine)Get(userId string)(int, bool){
+	if !checkKey(userId){
+		return 0, false
+	}
     val, ok := db.balance[userId]
     if !ok{
         val = db.initValue
         db.balance[userId] = val
+		ok = true
     }
     return val, ok
 }
@@ -74,16 +83,19 @@ func (db *DatabaseEngine)UpdateBalance(block *Block, flag int)bool{
     //flag is either -1 or 1
     num := len(block.Transactions)
 
-    mining_total := 0 
+    mining_total := 0
     for _, i:=range block.Transactions{
         //suppose i.MiningFee >= 0
+		if int(i.MiningFee)<0{
+			return false
+		}
         mining_total = mining_total + int(i.MiningFee)
     }
 
-    if flag == -1{
+    /*if flag == -1{
         //When flag == -1, I don't need to check whether it's correct
         db.Add(block.MinerID, -mining_total)
-    }
+    }*/
 
     start, end := 0, num
     if flag == -1{
@@ -107,15 +119,10 @@ func (db *DatabaseEngine)UpdateBalance(block *Block, flag int)bool{
                     break
                 }
             }
-            if flag == -1{
-                db.Add(block.MinerID, mining_total)
-            }
             return false
         }
     }
-    if flag == 1{
-        db.Add(block.MinerID, mining_total)
-    }
+    db.Add(block.MinerID, mining_total*flag)
     return true
 }
 
