@@ -29,7 +29,6 @@ func (s *server) Transfer(ctx context.Context, in *pb.Transaction) (*pb.BooleanR
 func (s *server) Verify(ctx context.Context, in *pb.Transaction) (*pb.VerifyResponse, error) {
 	return &pb.VerifyResponse{Result: pb.VerifyResponse_FAILED, BlockHash:"?"}, nil
 }
-
 func (s *server) GetHeight(ctx context.Context, in *pb.Null) (*pb.GetHeightResponse, error) {
 	return &pb.GetHeightResponse{Height: 1, LeafHash: "?"}, nil
 }
