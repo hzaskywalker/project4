@@ -50,20 +50,12 @@ type Miner struct{
     //store the longest chains
     longest *Block
 
-    //We need to store the currentDataBase pointer
-    //Although in most of the time, currentDataBase == longest
-    currentDataBase *Block
-
-
     //database handle the balance of each person
     database *DatabaseEngine
-    balanceLock sync.RWMutex
 
     //transfers handles transactions
     transfers *TransferManager
 
-    //server handle the consensus with other servers
-    //this is a interface
     server Server
 }
 
@@ -158,27 +150,26 @@ func (m *Miner) LCA(a *Block, b *Block)(*Block, error){
     return a, nil
 }
 
-func (m *Miner) UpdateBalance(block *Block)error{
-    //Update the balance to this branch
+func (m *Miner) UpdateBalance(database *DatabaseEngine, block *Block, updateStatus bool)error{
 
-    //Also I need to change the transfer management
-    //Add lock here
-    m.balanceLock.Lock()
-    defer m.balanceLock.Unlock()
-
-    A:=m.currentDataBase
+    A := database.block
+    if A == block {
+        return nil
+    }
     lca, e := m.LCA(A, block)
     if e!=nil{
         return e
     }
-    //fmt.Println(m.currentDataBase.BlockID, block.BlockID)
+
     for ;A!=lca; {
-        m.database.UpdateBalance(A, -1)
-        m.transfers.UpdateBlockStatus(A, 1)//should all be pendding
+        database.UpdateBalance(A, -1)
+        if updateStatus{
+            m.transfers.UpdateBlockStatus(A, 1)//should all be pendding
+        }
         A, e = m.Findfather(A) //The result should be cached 
     }
-    var b []*Block
 
+    var b []*Block
     for B:=block;B!=lca; {
         b = append(b, B)
         B, e = m.Findfather(B)
@@ -186,29 +177,25 @@ func (m *Miner) UpdateBalance(block *Block)error{
 
     for i:=len(b)-1;i>=0;i--{
         if m.database.UpdateBalance(b[i], 1){
-            m.transfers.UpdateBlockStatus(b[i], 0)//should all be success
+            if updateStatus{
+                m.transfers.UpdateBlockStatus(b[i], 0)
+                //it's done only when we change longest which has been verified 
+            }
         }else{
             for j:=i+1;j<=len(b)-1;j++{
                 m.database.UpdateBalance(b[i], -1)
             }
-            //not for sure
             m.currentDataBase = lca
-            //We may need to mask this block to be nil
-            //so that we would not calc them again?
             return errors.New("Get error on calculating balance")
         }
     }
-    m.currentDataBase = block
+    database.block = block
     return nil
 }
 
 func (m *Miner) UpdateLongest(block *Block)error{
-    //Suppose the block is ok and checked
-    //m.longest should never be nil
-    //error may happen when we try to update the balance
-    //we need to make sure it's correct
     if m.longest.GetHeight() < block.GetHeight() {
-        e := m.UpdateBalance(block)
+        e := m.UpdateBalance(m.databse, block, true)
         if e!=nil{
             fmt.Println(e)
             return e
@@ -218,70 +205,35 @@ func (m *Miner) UpdateLongest(block *Block)error{
     return nil
 }
 
+func (m *Miner) VerifyBlock(block *Block)error{
+    database := NewDatabaseEngine(m.database)
+    e := m.UpdateBalance(database, block, false)
+
+    if e == nil{
+        return nil
+    }else{
+        m.hash2block[hash] = nil
+        return errors.New("block balance wrong")
+    }
+}
+
 func (m *Miner) InsertBlock(block *Block)error{
-    //We need verify something
-    //should this been paralleled?
-    //Here we have checked the block
-    //We would only insert the block if it's better than longest
+    //Insert block, without veryfy and update
     hash := block.GetHash()
     _, ok := m.Findfather(block)
     if ok == nil {
         m.hash2block[hash] = block
-        e := m.UpdateBalance(block)
-
-        if e == nil{
-            m.UpdateLongest(block)
-            return nil
-        }else{
-            m.hash2block[hash] = nil
-            return errors.New("block balance wrong")
-        }
     }else{
         return errors.New("block's father not found")
     }
 }
 
-func (m *Miner) GetHeight(hash string) (int, *Block) {
-    //return the height and the block of last Block 
-    //There should be no error
-    return m.longest.GetHeight(), m.longest
-}
-
-func (m *Miner) Get(userId string)(int, bool){
-    //return the balance information on the last block
-    //There should be no error
-    return m.database.Get(userId)
-}
-
-func (m *Miner) TRANSFER(t *Transaction)bool{
-    return false
-}
-
-func (m *Miner) Verify(t *Transaction)bool{
-    //check
-    return false
-}
-
 func (m *Miner) GetBalance()map[string]int{
     //lock currentDataBase
     if m.currentDataBase != m.longest{
-        m.UpdateBalance(m.longest)
+        m.UpdateBalance(m.longest, false)
     }
-    //the result of balance should never be error
     return m.database.GetBalance()
-}
-
-func (m *Miner) GetBalanceString(hash string)(map[string]int, bool){
-    block, ok := m.GetBlock(hash)
-    if !ok{
-        return nil, false
-    }
-    if block != m.currentDataBase{
-        if m.UpdateBalance(block)==nil{
-            return nil, false
-        }
-    }
-    return m.database.GetBalance(), true
 }
 
 func (m *Miner) Init(){
@@ -302,85 +254,54 @@ func (m *Miner) Init(){
         fmt.Println(e)
         os.Exit(1)
     }
+    e := m.VerifyBlock(newLongest)
+    if e!=nil{
+        fmt.Println(e)
+        os.Exit(1)
+    }
+    m.UpdateLongest(newLongest)
 }
 
-
-func (T *TransferManager)GetPendingByBalance(balance *map[string]int, result chan *Transaction, stop chan int){
-    //should stop by stop
-    T.PendingLock.Lock()
-    defer T.PendingLock.Unlock()
-
-
-    for ;len(T.Pending)==0;{
-        T.PendingNotEmpty.Wait()
-    }
-
-    var t *Transaction
-    for _, val:=range T.Pending{
-        t = val
-        val.flag = 2
-        break
-    }
-    if t!=nil{
-        delete(T.Pending, t.UUID)
-    }
-    return t
+func (m *Miner) AddBlockWithoutCheck(block *Block, finish chan *Block){
+    m.InsertBlock(block)
+    finish <- block
 }
 
 func (m *Miner) mainLoop() error{
-    /*
-        You have only following two thread:
-            1. one for solve hash proble
-            2. one for:
-                1. receiving other's push, save in a buffer of server
-                    if we found it's longer than current, add it and check balance
-                    otherwise we ignore it
-                2. if we don't have a longer block
-                    we keep our balance on longest block
-                    verify new transactions and select block 
+    waitBlocks := make(chan *Block, 50)
+    stopSelectTrans := make(chan int)
 
-                However we want parallel the check and select
-                    How about maitaining two balance?
-                    Or just copy it?
+    is_solved := make(chan int, 50)
+    stop_solve := make(chan int)
 
-                Right now let's forget it
-        */
-    get_pending := make(chan *Transaction)
-    stop_pending := make(chan int)
-
-    is_solved := make(chan int)
-
+    isAdded := make(chan *block, 50)
     server_query := make(chan int) //stands for all serveer query
 
-    currentBlock = MakeNewBlockAfter(m.longest, "MYID")
-    var solvingBlock *Block
-    go m.transfers.GetPendingByBalance(m.GetBalance(), get_pending)
+    database := NewDatabaseEngine(m.database)
+    go m.transfers(database, waitBlocks, stopSelectTrans)
 
     for ;; {
-        /*
-        In each round, either
-            1. Solve a block
-                or Recieve Put a new Block
-            2. Get a new transaction 
-            */
-
-        //do other things..
-
         var newBlocks *Block
         newBlocks = nil
 
         select {
-            case is_solved := <- success:
-                if is_solved == 1{
-                    newBlocks = solvingBlock
-                    solvingBlock = nil
+            case addedBlock := <- is_add:
+                if addedBlock.GetHeight() > m.longest.GetHeight(){
+                    e := VerifyBlock(addedBlock)//place where we change the consensus
+                    if e == nil{
+                        stop_solve <- 1 //stop solving
+                        stopSelectTrans <- 1 //so that pending would release lock
+                        m.UpdateLongest(addedBlock)
+
+                        go m.transfers.GetBlocksByBalance()
+                    }
                 }
-            case t := <- get_pending{
-                //update balance by t
-                go m.transfers.GetPendingByBalance(m.GetBalance(), get_pending, stop_pending)
+            case solved := <- is_solved:
+                newBlocks = solvingBlock
+            case block := <- waitBlocks{
+                go block.Solve(stop_solve, is_add)
             }
             case s := <-server_query{
-                //anser the server query
             }
             case <-time.After(time.Second):
                 //decide wether to start a new block or any other strategy
@@ -388,9 +309,7 @@ func (m *Miner) mainLoop() error{
         }
 
         if newBlocks{
-            //add newBlocks
-            //return balance to longest
-            //then check for new putting block if it's blockid is heigher?
+            go m.AddBlockWithoutCheck(newBlocks, is_add)
         }
     }
 }

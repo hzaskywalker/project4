@@ -2,17 +2,13 @@ package main
 
 /*
 About transfer:
-    0. the trasnsaction in longest has flag 0, the one in undecided block has flag 2, Pending one has flag 1
-    1. Using another thread to store the transaction
-    2. Store the new trasaction into a buffer and push it to other server
-    3. Verify it with the Miner
-    4. Push the transaction to Miner if we get a certain number of transactions
-        return True if it's added into the longest branch
-        Otherwise return failed
-    5. Miner and Transfer shall maitain consensus about all happened transfer
-        However I don't want Miner to handle it.
-    6. We needn't store the transanctions on disk. Suppose program crashed, we can rebuild the Transfer system easily by blocks
-        Just forget anything about the pending one.
+    1. We have a pool of transaction, with some on longest (type 0) and some on pending (type 1)
+    2. type 0 would change only when changing longest, new comer become type 1
+
+    3. Miner would have a thread that receive all of the things of type 1 and the new comer.
+        1. We have 2 producer for miner: previous pending and new comers 
+        2. Miner can store the transactions now and decide later
+        3. But we need to guarantee that new comer is not the same with the previous one
     */
 
 import (
@@ -54,8 +50,10 @@ type TransferManager struct{
     //use map to implement set
     Pending TransHouse
     PendingLock sync.RWMutex
+    stopProducer chan bool
 
     PendingNotEmpty *sync.Cond
+    channel chan *Transaction
 }
 
 func (T *TransferManager)GetDictSize()int{
@@ -99,20 +97,9 @@ func (T *TransferManager)SetFlag(t *Transaction, flag int){
 }
 
 func (T *TransferManager)GetPending()*Transaction{
-    //flag 0 in longest chain
-    //flag 1 in Pending list
-    //flag in some blocks that not on the longest chain
-
-    //return a Pending transaction
-    //wait if the result is nil
-
-    //may need carefully design
     T.PendingLock.Lock()
     defer T.PendingLock.Unlock()
-
-
     for ;len(T.Pending)==0;{
-        //fmt.Println("Pending")
         T.PendingNotEmpty.Wait()
     }
 
@@ -125,7 +112,6 @@ func (T *TransferManager)GetPending()*Transaction{
     if t!=nil{
         delete(T.Pending, t.UUID)
     }
-    //fmt.Println("get something in Pending list: ", t)
     return t
 }
 
@@ -145,8 +131,6 @@ func (T *TransferManager)WriteTransaction(t *Transaction){
 }
 
 func (T *TransferManager)ReadWriteTransaction(t *Transaction)bool{
-    //check whether we have not seen this transaction
-    //seems that Go doesn't support two phase lock..
     T.lock.Lock()
     defer T.lock.Unlock()
 
@@ -154,8 +138,6 @@ func (T *TransferManager)ReadWriteTransaction(t *Transaction)bool{
     if ok {
         return false
     }
-    //T.lock.Lock()
-    //defer T.lock.Unlock()
 
     T.dict[t.UUID] = t
     T.SetFlag(t, 1)
@@ -163,26 +145,18 @@ func (T *TransferManager)ReadWriteTransaction(t *Transaction)bool{
 }
 
 func (T *TransferManager)UpdateBlockStatus(block *Block, flag int){
-    //add or delete the informations in the block
     T.lock.Lock()
     defer T.lock.Unlock()
-    //change the flag
-    //add new transactions into the pool
 
     for _, t :=range block.Transactions{
-        //use UUID to mark the flag of transaction
-        //avoid the difference version of flag
-
         _, ok := T.dict[t.UUID]
         if !ok{
             T.dict[t.UUID] = new(Transaction)
             T.dict[t.UUID].flag = flag
         }
         T.dict[t.UUID].trans = t
-        //fmt.Println(t.UUID, flag, len(T.Pending))
         T.SetFlag(T.dict[t.UUID], flag)
         if flag == 3{
-            //delete: for debug
             delete(T.dict, t.UUID)
         }
     }
@@ -190,13 +164,19 @@ func (T *TransferManager)UpdateBlockStatus(block *Block, flag int){
 
 func (T* TransferManager)Producer(){
     for {
-        t := T.server.TRANSFER()
-        T.ReadWriteTransaction(t)
+        select {
+            case <- self.stopProducer:
+                return
+            default:
+                t := T.server.TRANSFER()
+                if T.ReadWriteTransaction(t){
+                    T.channel <- t
+                }
+        }
     }
 }
 
 func (T *TransferManager)GetBlock(channel chan *Block){
-    //get a new block with certain number of transfers
     block := MakeNewBlock()
     for i:=0;i<50;i++{
         t := T.GetPending()
@@ -209,4 +189,48 @@ func (T *TransferManager)GetBlockSync()*Block{
     channel := make(chan *Block)
     go T.GetBlock(channel)
     return <- channel
+}
+
+func (T *TransferManager) ProducerByPendingList(Pending TransHouse, channel chan *Transaction){
+    for _, t:=range Pending{
+        channel <- t
+    }
+}
+
+func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result chan *Block, stop chan int){
+    //Maybe we need to verify the previous result first
+    T.stopProducer <- true
+    T.channel = make(chan *Transactions, 500)
+    go T.Producer()
+
+    T.PendingLock.Lock()
+    go ProducerByPendingList(T.Pending, T.channel)
+    T.Pending = make(TransHouse) 
+    T.PendingLock.Unlock()
+
+    block := MakeNewBlock()
+    for ;;{
+        select {
+            case t := <- T.channel
+                //I also need to check UUID
+                if t.Value > database.Get(t.FromID){
+                    continue
+                }
+
+                m.database.Transfer(t.FromID, t.ToID, int(t.Value), int(t.Value - t.MiningFee))
+                block.Transactions = append(block.Transactions, t)
+
+                if len(block.Transactions) == 50{ //Or stop
+                    for _, t:=block.Transactions{
+                        database.Add(block.MinerID, int(t.MiningFee))
+                    }
+                    result <- block
+                    block = MakeNewBlock()
+                }
+            case signal := <- stop:
+                if signal == 1{
+                }
+                return
+        }
+    }
 }

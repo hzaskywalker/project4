@@ -26,16 +26,22 @@ type Balance map[string]int
 type DatabaseEngine struct {
     balance Balance
     initValue int
-    sync.RWMutex
+    fa *DatabaseEngine
+    block *Block //maintain the block
 }
 
 func checkKey(userId string)bool{
     return len(userId) == 8
 }
 
-func NewDatabaseEngine()*DatabaseEngine{
+func NewDatabaseEngine(fa *DatabaseEngine)*DatabaseEngine{
     fmt.Println("NewDatabaseEngine")
-    return &DatabaseEngine{balance: make(Balance), initValue: 1000}
+    D := &DatabaseEngine{balance: make(Balance), initValue: 1000}
+    D.fa = fa
+    if fa!=nil{
+        D.block = D.fa.block
+    }
+    return D
 }
 
 func (db *DatabaseEngine)Add(userId string, delta int)bool{
@@ -44,7 +50,12 @@ func (db *DatabaseEngine)Add(userId string, delta int)bool{
 	}
     val, ok := db.balance[userId]
     if !ok{
-        val = db.initValue
+        if db.fa ==nil {
+            val = db.initValue
+        }
+        else{
+            val = db.fa.Get(userId)
+        }
     }
 	val += delta
 	db.balance[userId] = val
@@ -67,14 +78,16 @@ func (db *DatabaseEngine)Transfer(from string, to string, value int, value2 int)
 }
 
 func (db *DatabaseEngine)Get(userId string)(int, bool){
-	if !checkKey(userId){
-		return 0, false
-	}
     val, ok := db.balance[userId]
     if !ok{
-        val = db.initValue
+        if db.fa == nil{
+            val = db.initValue
+        }
+        else {
+            val = db.fa.Get(userId)
+        }
         db.balance[userId] = val
-		ok = true
+        ok = true
     }
     return val, ok
 }

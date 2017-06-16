@@ -220,7 +220,7 @@ func TestDatabaseEngine(s *MyServer){
     blocks := s.GenerateChain(s.longest.GetHash())
 
     for i:=0;i<len(blocks);i++{
-        D.UpdateBalance(blocks[i], 1)
+        D.UpdateBalance(blocks[i], 1, true)
     }
     fmt.Println("Check forward result: ", CompareBalance(D.GetBalance(), s.CalcBalance(s.longest.GetHash())))
 
@@ -230,11 +230,11 @@ func TestDatabaseEngine(s *MyServer){
         aim := rand.Intn(len(blocks)+1)
         if now>aim{
             for j:=now-1;j>=aim;j--{
-                D.UpdateBalance(blocks[j], -1)
+                D.UpdateBalance(blocks[j], -1, true)
             }
         }else{
             for j:=now;j<aim;j++{
-                D.UpdateBalance(blocks[j], 1)
+                D.UpdateBalance(blocks[j], 1, true)
             }
         }
         //fmt.Println("block", now, "to", aim)

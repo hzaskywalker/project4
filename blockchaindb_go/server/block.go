@@ -127,7 +127,7 @@ func (b *Block) Unmarshal(data string){
     return
 }
 
-func (b* Block) Solve(stop chan int, solved chan int){
+func (b* Block) Solve(stop chan int, solved chan *Block){
     b.Nonce = "XXXXXXXX"
     data := b.MarshalToString()
     index := strings.Index(data, b.Nonce)
@@ -153,7 +153,7 @@ func (b* Block) Solve(stop chan int, solved chan int){
             b.Nonce = newNonce
             //fmt.Println(b.GetHash())
             b.MyHash = hashVal
-            solved <- 1
+            solved <- b
             return
         }
     }
