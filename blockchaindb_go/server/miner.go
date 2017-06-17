@@ -23,6 +23,7 @@ type Miner struct{
     mapLock sync.RWMutex
 
     cached bool
+	MinerID string
 }
 
 func NewMiner(server_ Server) Miner{
