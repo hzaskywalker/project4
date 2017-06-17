@@ -52,7 +52,7 @@ func main() {
     HashHardness = 5
     InitHash = "0000000000000000000000000000000000000000000000000000000000000000"
 
-    TestMiner()
+    TestMainLoop()
     return
 
     flag.Parse()

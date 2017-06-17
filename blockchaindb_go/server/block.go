@@ -128,6 +128,7 @@ func (b *Block) Unmarshal(data string){
 }
 
 func (b* Block) Solve(stop chan int, solved chan *Block){
+    //must be stopped by the caller
     b.Nonce = "XXXXXXXX"
     data := b.MarshalToString()
     index := strings.Index(data, b.Nonce)
@@ -154,9 +155,11 @@ func (b* Block) Solve(stop chan int, solved chan *Block){
             //fmt.Println(b.GetHash())
             b.MyHash = hashVal
             solved <- b
+            <- stop
             return
         }
     }
+    <- stop
 }
 
 func (b *Block) SolveSync()string{
@@ -164,5 +167,6 @@ func (b *Block) SolveSync()string{
     solved := make(chan *Block)
     go b.Solve(stop, solved)
     <- solved
+    stop <- 1
     return b.MyHash
 }

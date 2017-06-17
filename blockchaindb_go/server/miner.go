@@ -204,6 +204,7 @@ func (m *Miner) UpdateLongest(block *Block)error{
 }
 
 func (m *Miner) VerifyBlock(block *Block)error{
+    //fmt.Println(m.databaseLongest)
     database := NewDatabaseEngine(m.databaseLongest)
     e := m.UpdateBalance(database, block, false)
 
@@ -267,11 +268,15 @@ func (m *Miner) AddBlockWithoutCheck(block *Block, finish chan *Block){
 }
 
 func (m *Miner) mainLoop() error{
+    m.Init()
+
     waitBlocks := make(chan *Block, 50)
     stopSelectTrans := make(chan int)
 
-    is_solved := make(chan *Block, 50)
-    stop_solve := make(chan int)
+    is_solved := make(chan *Block)
+    var stop_solve chan int
+
+    toSolve := make([]*Block, 0)
 
     isAdded := make(chan *Block, 50)
     server_query := make(chan int) //stands for all serveer query
@@ -279,17 +284,24 @@ func (m *Miner) mainLoop() error{
     database := NewDatabaseEngine(m.databaseLongest)
     go m.transfers.GetBlocksByBalance(database, waitBlocks, stopSelectTrans)
 
+    var newBlocks *Block
     for ;; {
-        var newBlocks *Block
         newBlocks = nil
 
+        fmt.Println("=========main loop========")
         select {
             case addedBlock := <- isAdded:
                 if addedBlock.GetHeight() > m.longest.GetHeight(){
-                    e := m.VerifyBlock(addedBlock)//place where we change the consensus
+                    e := m.VerifyBlock(addedBlock)
+                    //place where we change the consensus
                     if e == nil{
-                        stop_solve <- 1 //stop solving
+                        if stop_solve != nil{
+                            stop_solve <- 1 //stop solving
+                        }
                         stopSelectTrans <- 1 //so that pending would release lock
+
+                        //we need stop other verifier, otherwise their databse would be wrong
+                        fmt.Println("Update longest")
                         m.UpdateLongest(addedBlock)
 
                         go m.transfers.GetBlocksByBalance(database, waitBlocks, stopSelectTrans)
@@ -297,8 +309,23 @@ func (m *Miner) mainLoop() error{
                 }
             case solved := <- is_solved:
                 newBlocks = solved
+                stop_solve <- 1
+                stop_solve = nil
+                fmt.Println("solved")
+                if len(toSolve) > 0{
+                    stop_solve = make(chan int)
+                    go toSolve[0].Solve(stop_solve, is_solved)
+                    toSolve = toSolve[1:]
+                }
+
             case block := <- waitBlocks:
-                go block.Solve(stop_solve, isAdded)
+                toSolve = append(toSolve, block)
+                if stop_solve == nil{
+                    stop_solve = make(chan int)
+                    fmt.Println("start solve")
+                    go block.Solve(stop_solve, is_solved)
+                    toSolve = toSolve[1:]
+                }
             case _ = <-server_query:
             case <-time.After(time.Second):
                 //decide wether to start a new block or any other strategy

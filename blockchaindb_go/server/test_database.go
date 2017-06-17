@@ -26,9 +26,11 @@ import (
 type MyServer struct{
     //brute force code for balance calculating
     FakeServer //in test_server
+    startUUID int
 
     blocks map[string]*Block
     longest *Block
+    sender chan *Block
 
     TransferSender chan *Transaction
 }
@@ -127,7 +129,7 @@ func (s *MyServer) TRANSFER()*Transaction{
     return <- s.TransferSender
 }
 
-func (s *MyServer) GenerateNewBlock(hash string, num_trans int, valid bool, startUUID int)*Block{
+func (s *MyServer) GenerateNewBlock(hash string, num_trans int, valid bool)*Block{
     /*
         Geerate NewBlocks after the blocks[hash]
     */
@@ -151,6 +153,9 @@ func (s *MyServer) GenerateNewBlock(hash string, num_trans int, valid bool, star
             toGen = 1
         }
         value := rand.Intn(toGen)
+        if value>balance[a]{
+            value = 0
+        }
 
         if !valid && i==3{
             value = balance[a] + 1
@@ -162,7 +167,8 @@ func (s *MyServer) GenerateNewBlock(hash string, num_trans int, valid bool, star
         balance[a] -= value
         balance[b] += value - mining_fee
 
-        t := GenTransaction(a, b, value, mining_fee, fmt.Sprintf("%08x", i + startUUID))
+        s.startUUID += 1
+        t := GenTransaction(a, b, value, mining_fee, fmt.Sprintf("%08x", s.startUUID))
         go s.SendTransfer(t)
 
         Transactions = append(Transactions, t.trans)
@@ -195,13 +201,14 @@ func (s *MyServer) GenerateNewBlock(hash string, num_trans int, valid bool, star
 }
 
 func (s *MyServer)init(n int, initilize int, num_trans int){
+    s.sender = make(chan *Block)
     s.balance = make(map[string]int)
     s.blocks = make(map[string]*Block)
     s.TransferSender = make(chan *Transaction)
     for i:=0;i<n;i++{
         s.people_id = append(s.people_id, fmt.Sprintf("%08x", i)) //%x or %d?
     }
-    s.longest = s.GenerateNewBlock(InitHash, num_trans, true, 0)
+    s.longest = s.GenerateNewBlock(InitHash, num_trans, true)
     balance := s.CalcBalance(s.longest.GetHash())
 
     res := CompareBalance(balance, s.balance)
@@ -264,12 +271,6 @@ func TestDatabaseEngine(s *MyServer){
     //TODO: check the code for incorrect block
 }
 
-func (*MyServer)GetBlocksByBalance(database *DatabaseEngine, results chan *Block, stop chan int) {
-}
-
-func TestMainLoop(){
-}
-
 func TestMiner(){
     /*
         First, let's test the sync code:
@@ -315,7 +316,7 @@ func TestMiner(){
     num_link := rand.Intn(len(blocks))
 
     //must break the tie to make s.longest
-    t := s.GenerateNewBlock(blocks[num_link].GetHash(), num_later, true, num_before + 10)
+    t := s.GenerateNewBlock(blocks[num_link].GetHash(), num_later, true)
 
     miner.InsertBlock(t)
     miner.VerifyBlock(t)
@@ -352,14 +353,14 @@ func TestMiner(){
     }
 
     //invalid block
-    invalid := s.GenerateNewBlock(s.longest.GetHash(), 104, false, num_before + num_later + 13)
+    invalid := s.GenerateNewBlock(s.longest.GetHash(), 104, false)
     invalid.PrevHash = "xxxx"
     invalid.MyHash = ""
     e := miner.InsertBlock(invalid)
     if e==nil{
         fmt.Println("doesn't detect no father error!")
     }
-    invalid = s.GenerateNewBlock(s.longest.GetHash(), 104, false, num_before + num_later + 200)
+    invalid = s.GenerateNewBlock(s.longest.GetHash(), 104, false)
     e = miner.InsertBlock(invalid)
     if e != nil{
         fmt.Println("Error on Insert Invalid Block")

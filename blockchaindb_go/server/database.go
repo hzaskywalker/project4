@@ -16,7 +16,7 @@ Question:
 
 
 import (
-    //"fmt"
+    "fmt"
 )
 
 type Balance map[string]int
@@ -47,7 +47,7 @@ func (db *DatabaseEngine)Add(userId string, delta int)bool{
 	}
     val, ok := db.balance[userId]
     if !ok{
-        if db.fa ==nil {
+        if db.fa == nil {
             val = db.initValue
         }else{
             val, _ = db.fa.Get(userId)
@@ -116,6 +116,12 @@ func (db *DatabaseEngine)UpdateBalance(block *Block, flag int)bool{
 
         value, value2 := int(transaction.Value), int(transaction.Value - transaction.MiningFee)
         ok := db.Transfer(transaction.FromID, transaction.ToID, value*flag, value2*flag)
+        
+        /*
+        a, _:= db.Get(transaction.FromID)
+        b, _:= db.Get(transaction.ToID)
+        fmt.Println(transaction.FromID, transaction.ToID, a, b, value, value2)
+        */
 
         if !ok{
             //restore the transaction before
@@ -140,5 +146,6 @@ func (db *DatabaseEngine)UpdateBalance(block *Block, flag int)bool{
 }
 
 func (db *DatabaseEngine)GetBalance()Balance{
+    fmt.Print("")
     return db.balance
 }
