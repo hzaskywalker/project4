@@ -35,20 +35,22 @@ func (s *server) Verify(ctx context.Context, in *pb.Transaction) (*pb.VerifyResp
     //return &pb.VerifyResponse{Result: pb.VerifyResponse_FAILED, BlockHash:"?"}, nil
 	return s.s.Verify(in)
 }
+func (s *server) PushTransaction(ctx context.Context, in *pb.Transaction) (*pb.Null, error) {
+    //return &pb.Null{}, nil
+	return s.s.PushTransaction(in)
+}
+func (s *server) PushBlock(ctx context.Context, in *pb.JsonBlockString) (*pb.Null, error) {
+    //return &pb.Null{}, nil
+	return s.s.PushBlock(in)
+}
 func (s *server) GetHeight(ctx context.Context, in *pb.Null) (*pb.GetHeightResponse, error) {
     return s.s.GetHeight(in)
 }
 func (s *server) GetBlock(ctx context.Context, in *pb.GetBlockRequest) (*pb.JsonBlockString, error) {
     return s.s.GetBlock(in)
 }
-func (s *server) PushBlock(ctx context.Context, in *pb.JsonBlockString) (*pb.Null, error) {
-    //return &pb.Null{}, nil
-	return s.s.PushBlock(in)
-}
-func (s *server) PushTransaction(ctx context.Context, in *pb.Transaction) (*pb.Null, error) {
-    //return s.s.PushTransaction(in)
-    return &pb.Null{}, nil
-}
+
+
 
 var id=flag.Int("id",1,"Server's ID, 1<=ID<=NServers")
 
@@ -71,19 +73,18 @@ func main() {
     
 
     // Read config
-    address, _ := func() (string, string) {
-        conf, err := ioutil.ReadFile("config.json")
-        if err != nil {
-            panic(err)
-        }
-        var dat map[string]interface{}
-        err = json.Unmarshal(conf, &dat)
-        if err != nil {
-            panic(err)
-        }
-        dat = dat[IDstr].(map[string]interface{}) // should be dat[myNum] in the future
-        return fmt.Sprintf("%s:%s", dat["ip"], dat["port"]), fmt.Sprintf("%s",dat["dataDir"])
-    }()
+	conf, err := ioutil.ReadFile("config.json")
+	if err != nil {
+		panic(err)
+	}
+	var dat map[string]interface{}
+	err = json.Unmarshal(conf, &dat)
+	if err != nil {
+		panic(err)
+	}
+	dat = dat[IDstr].(map[string]interface{}) // should be dat[myNum] in the future
+	address, _ := fmt.Sprintf("%s:%s", dat["ip"], dat["port"]), fmt.Sprintf("%s",dat["dataDir"])
+	
 
     // Bind to port
     lis, err := net.Listen("tcp", address)

@@ -116,6 +116,10 @@ func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result cha
 			T.pendingLock.Lock()
 			T.lock.Lock()
 			for _, t := range T.dict[2]{
+				tmp, ok := T.dict[0][t.trans.UUID]
+				if ok{
+					continue
+				}
 				t.flag = 1
 				T.dict[1][t.trans.UUID] = t
 			}
