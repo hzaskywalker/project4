@@ -163,6 +163,14 @@ func (T *TransferManager)UpdateBlockStatus(block *Block, flag int){
     }
 }
 
+func (T* TransferManager)Producer(){
+    for {
+        t := T.server.TRANSFER()
+        if T.ReadWriteTransaction(t){
+        }
+    }
+}
+
 /*
 func (T* TransferManager)Producer(){
     for {

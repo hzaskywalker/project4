@@ -146,7 +146,16 @@ func (s *MyServer) GenerateNewBlock(hash string, num_trans int, valid bool, star
         a := s.people_id[rand.Intn(n)]
         b := s.people_id[rand.Intn(n)]
 
-        value := rand.Intn(balance[a] + 1)
+        toGen := balance[a] + 1
+        if toGen <= 0{
+            toGen = 1
+        }
+        value := rand.Intn(toGen)
+
+        if !valid && i==3{
+            value = balance[a] + 1
+        }
+
         mining_fee := rand.Intn(value + 1)
         totalMiningFee += mining_fee
 
@@ -258,6 +267,9 @@ func TestDatabaseEngine(s *MyServer){
 func (*MyServer)GetBlocksByBalance(database *DatabaseEngine, results chan *Block, stop chan int) {
 }
 
+func TestMainLoop(){
+}
+
 func TestMiner(){
     /*
         First, let's test the sync code:
@@ -280,6 +292,7 @@ func TestMiner(){
 
     miner := NewMiner(&s)
     miner.Init()
+
     pending_size_init := miner.GetTransferManager().GetPendingSize()
     fmt.Println("dict size", miner.GetTransferManager().GetDictSize())
     fmt.Println("pending_size after init ", pending_size_init)
@@ -303,11 +316,14 @@ func TestMiner(){
 
     //must break the tie to make s.longest
     t := s.GenerateNewBlock(blocks[num_link].GetHash(), num_later, true, num_before + 10)
+
     miner.InsertBlock(t)
+    miner.VerifyBlock(t)
     if t.BlockID>s.longest.BlockID{
         s.longest = t
         fmt.Println("switch longest")
     }
+    miner.UpdateLongest(t)
 
 
     res = CompareBalance(miner.GetBalance(), s.CalcBalance(s.longest.GetHash()))
@@ -333,6 +349,31 @@ func TestMiner(){
     if pending_size != pending_gt_num{
         fmt.Println("pending num is wrong")
         os.Exit(0)
+    }
+
+    //invalid block
+    invalid := s.GenerateNewBlock(s.longest.GetHash(), 104, false, num_before + num_later + 13)
+    invalid.PrevHash = "xxxx"
+    invalid.MyHash = ""
+    e := miner.InsertBlock(invalid)
+    if e==nil{
+        fmt.Println("doesn't detect no father error!")
+    }
+    invalid = s.GenerateNewBlock(s.longest.GetHash(), 104, false, num_before + num_later + 200)
+    e = miner.InsertBlock(invalid)
+    if e != nil{
+        fmt.Println("Error on Insert Invalid Block")
+    }
+    e = miner.VerifyBlock(invalid) 
+    if e == nil{
+        fmt.Println("Doesn't find the error of Invalid Block")
+    } else{
+        fmt.Println("Correct detect error ", e)
+    }
+    res = CompareBalance(miner.GetBalance(), s.CalcBalance(s.longest.GetHash()))
+    if !res{
+        fmt.Println("  Miner balance error after adding invalid block a longer chain!")
+        os.Exit(1)
     }
 }
 

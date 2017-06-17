@@ -65,6 +65,7 @@ func NewMiner(server_ Server) Miner{
         databaseLongest: NewDatabaseEngine(nil),
         server: server_,
         transfers: NewTransferManager(server_)}
+    go m.transfers.Producer()
     return m
 }
 
@@ -241,12 +242,12 @@ func (m *Miner) Init(){
     m.hash2block[InitHash] = &Block{MyHash:InitHash}
     m.longest = m.hash2block[InitHash]
     m.longest.BlockID = 0
+    m.databaseLongest.block = m.longest
 
     var newLongest *Block
     for ;!ok;{
         _, newLongest, ok = m.ServerGetHeight()
     }
-    fmt.Println("start insert")
     e := m.InsertBlock(newLongest)//longest would not be calculated
     if e!=nil{
         fmt.Println(e)

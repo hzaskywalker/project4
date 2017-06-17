@@ -16,7 +16,7 @@ Question:
 
 
 import (
-    "fmt"
+    //"fmt"
 )
 
 type Balance map[string]int
@@ -33,9 +33,8 @@ func checkKey(userId string)bool{
 }
 
 func NewDatabaseEngine(fa *DatabaseEngine)*DatabaseEngine{
-    fmt.Println("NewDatabaseEngine")
-    D := &DatabaseEngine{balance: make(Balance), initValue: 1000}
-    D.fa = fa
+    //fmt.Println("NewDatabaseEngine")
+    D := &DatabaseEngine{balance: make(Balance), initValue: 1000, fa: fa}
     if fa!=nil{
         D.block = D.fa.block
     }
