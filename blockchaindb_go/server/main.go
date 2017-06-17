@@ -46,7 +46,8 @@ func (s *server) PushBlock(ctx context.Context, in *pb.JsonBlockString) (*pb.Nul
 	return s.s.PushBlock(in)
 }
 func (s *server) PushTransaction(ctx context.Context, in *pb.Transaction) (*pb.Null, error) {
-    return s.s.PushTransaction(in)
+    //return s.s.PushTransaction(in)
+    return &pb.Null{}, nil
 }
 
 var id=flag.Int("id",1,"Server's ID, 1<=ID<=NServers")
@@ -92,19 +93,20 @@ func main() {
     log.Printf("Listening: %s ...", address)
 
     // Create gRPC server
-	s := grpc.NewServer()
-	q := RealServer{ctx:context.Background(), rpc:s}
+	grpc_s := grpc.NewServer()
+	q := RealServer{ctx:context.Background(), rpc:grpc_s}
 	miner := NewMiner(&q)
-	miner.MinerID=
-	s.s = NewService{}
-	s.s.transfer = miner.transfer
-    pb.RegisterBlockChainMinerServer(s, &server{})
+
+    s := &server{}
+	s.s = NewService()
+	s.s.transfer = miner.transfers
+    pb.RegisterBlockChainMinerServer(grpc_s, s)
     // Register reflection service on gRPC server.
-    reflection.Register(s)
-	go miner.mainloop(s.s)
+    reflection.Register(grpc_s)
+	go miner.mainLoop(s.s)
 
     // Start server
-    if err := s.Serve(lis); err != nil {
+    if err := grpc_s.Serve(lis); err != nil {
         log.Fatalf("failed to serve: %v", err)
     }
 }

@@ -93,6 +93,9 @@ func (T *TransferManager)AddPending(t_ *pb.Transaction){
 	T.lock[2].UnLock()
 }
 
+func (T *TransferManager) UpdateBlockStatus(block *Block, flag int){
+}
+
 func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result chan *Block, stop chan int){
 	for ;;{
 		if len(T.dict[2])>0{

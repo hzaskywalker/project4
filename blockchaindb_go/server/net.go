@@ -12,6 +12,8 @@ import (
     "errors"
     "golang.org/x/net/context"
     "fmt"
+    "google.golang.org/grpc"
+    "google.golang.org/grpc/reflection"
 )
 
 func checkUserID(UserID string)bool{
@@ -192,7 +194,7 @@ type Server interface{
 }
 
 type RealServer struct{
-    rpc *server
+    rpc *grpc.Server
     ctx context.Context
 }
 
@@ -232,4 +234,7 @@ func (s *RealServer)PushBlock(block *Block, success chan bool){
 
 func (s *RealServer)TRANSFER()*Transaction{
     return &Transaction{}
+}
+
+func (s *RealServer)GetBlocksByBalance(*DatabaseEngine, chan *Block, chan int){
 }

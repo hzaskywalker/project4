@@ -32,7 +32,6 @@ func NewMiner(server_ Server) Miner{
         databaseLongest: NewDatabaseEngine(nil),
         server: server_,
         transfers: NewTransferManager(server_)}
-    go m.transfers.Producer()
     return m
 }
 
@@ -260,13 +259,14 @@ func (m *Miner)GetBlocksByBalance(database *DatabaseEngine, result chan *Block, 
     for ;;{
         select{
             case <- stop:
-                stop_ <-
-                return
-            case res := <- m.transfers.GetBlocksByBalance(database, result, stop_)
+                stop_ <- true
+                break
+            case res := <- m.transfers.GetBlocksByBalance(database, result, stop_):
                 result <- res
             case time.After(time.Second * 10):
         }
     }
+    <-stop
 }
 
 func (m *Miner) mainLoop(service *Service) error{
