@@ -1,13 +1,5 @@
 package main
 
-/*
-data structure for a block, need:
-
-1. transformation between json and the structure
-2. calculate the current hash value
-3. solve for Nonce
-*/
-
 import (
     "../hash"
     pb "../protobuf/go"
@@ -107,12 +99,11 @@ func (b *Block)String()string {
     return b.MarshalToString()
 }
 
-func (b *Block) Unmarshal(data string){
+func (b *Block) Unmarshal(data string)error{
     block := new(pb.Block)
     e := jsonpb.UnmarshalString(data, block)
     if e!=nil{
-        fmt.Print("++++++++++++++++++++++++++++++++++++", e)
-        os.Exit(1)
+        return e
     }
 
     b.BlockID = block.BlockID
@@ -124,7 +115,7 @@ func (b *Block) Unmarshal(data string){
     for _, i := range block.Transactions{
         b.Transactions = append(b.Transactions, i)
     }
-    return
+    return nil
 }
 
 func (b* Block) Solve(stop chan int, solved chan *Block){
@@ -145,7 +136,7 @@ func (b* Block) Solve(stop chan int, solved chan *Block){
                     {}
             }
         }
-        newNonce := fmt.Sprintf("%08x", i)
+        newNonce := fmt.Sprintf("%08d", i)
         for j:=0;j<8;j++{
             data_list[index+j] = newNonce[j]
         }

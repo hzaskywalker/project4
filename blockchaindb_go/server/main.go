@@ -52,6 +52,8 @@ func main() {
     HashHardness = 5
     InitHash = "0000000000000000000000000000000000000000000000000000000000000000"
 
+    //TestDatabase()
+    //TestMiner()
     TestMainLoop()
     return
 

@@ -27,7 +27,7 @@ func TestMainLoop(){
     rand.Seed(time.Now().UnixNano())  
 
     fmt.Println("Test Main Loop")
-    HashHardness = 2
+    HashHardness = 3
     s := MyServer{}
     s.init(15, 1000, 153)
     //fmt.Println(s.CalcBalance(s.longest.GetHash()))
@@ -67,9 +67,14 @@ func TestMainLoop(){
         }
         break
     }
+    tmp = s.GenerateNewBlock(s.longest.GetHash(), 194, true)
+    s.sender <- tmp
+
     s.longest = s.GenerateNewBlock(s.longest.GetHash(), 203, true)
     service.PushBlock(&pb.JsonBlockString{Json:s.longest.MarshalToString()})
     <- time.After(time.Second)
+    fmt.Println(miner.longest.BlockID)
+    fmt.Println(s.longest.BlockID)
 
     res := CompareBalance(miner.GetBalance(), s.CalcBalance( s.longest.GetHash()) )
     if !res{

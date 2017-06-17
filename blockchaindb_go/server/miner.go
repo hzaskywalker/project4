@@ -1,62 +1,28 @@
 package main
-
 /*
-A miner should maintain:
-
-The tree of the blocks, the node of longest chain, and the corresponding balance.
-
-We can:
-    1. return the balance of any block:
-        find the lca to the longest chain and return the corresponding balance
-    2. get the longest block
-
-Modification to the status:
-    1. According to getHeight:
-        1. add blocks or change the branch
-    2. Collect transactions and calculate new blocks starting from the longest chain
-
-Cache and comminication:
-    1. Miner can suppose everything is stored on disk, net.go handle the communication between 
-       the miner and the (network or disk)
-
-About Transfer:
-    1. Reader and writer model
-    2. see transfer.go
-
-About mining:
-    1. New blocks that haven't been broadcast should not be added into Block 
-        => I am still think about it
-
-Some notes:
-    1. We use a simple map from string to block so that we can cache all of the blocks that we have.
-       Once a block is missing, we use get block to retrive the corresponding blocks.
-    2. The most of the computation should be used to solve the hash problem, so we needn't worry too
-       much about the other computations.
-   */
+    It's very clear to know what I am doing by looking at the mainloop
+    */
 
 import (
     "errors"
     "fmt"
     "time"
-    //"sync"
+    "sync"
     "os"
     "../hash"
 )
 
 type Miner struct{
-    //Cache all block in memory
-    //I am not going to solve the bonus
     hash2block  map[string]*Block
-    //store the longest chains
     longest *Block
 
-    //database handle the balance of each person
     databaseLongest *DatabaseEngine
-
-    //transfers handles transactions
     transfers *TransferManager
-
     server Server
+
+    mapLock sync.RWMutex
+
+    cached bool
 }
 
 func NewMiner(server_ Server) Miner{
@@ -82,19 +48,34 @@ func (m *Miner) ServerGetBlock(h string)(*Block, bool){
     //need check validity here or anything before server
 
     //verify that the hash value equal to its real value
+
+    if m.cached {
+        block, ok := ReadFromDisck(h)
+        if ok{
+            return block, ok
+        }
+    }
+
     block, ok := m.server.GetBlock(h)
     if !ok{
         return nil, ok
     }
-    if hash.GetHashString(block.MarshalToString()) != h{
+    Json := block.MarshalToString()
+    if hash.GetHashString(Json)!= h{
         fmt.Println("GetBlock's hash is not correct")
         return nil, false
+    }
+    if m.cached{
+        go WriteJson(h, Json)
     }
     return block, true
 }
 
 func (m *Miner) GetBlock(hash string)(*Block, bool){
+    m.mapLock.RLock()
     block, ok := m.hash2block[hash]
+    m.mapLock.RUnlock()
+
     if ok && block!=nil{
         return block, ok
     }else if ok && block==nil{
@@ -211,7 +192,9 @@ func (m *Miner) VerifyBlock(block *Block)error{
     if e == nil{
         return nil
     } else{
+        m.mapLock.Lock()
         m.hash2block[block.GetHash()] = nil
+        m.mapLock.Unlock()
         return errors.New("block balance wrong")
     }
 }
@@ -221,6 +204,8 @@ func (m *Miner) InsertBlock(block *Block)error{
     hash := block.GetHash()
     _, ok := m.Findfather(block)
     if ok == nil {
+        m.mapLock.Lock()
+        defer m.mapLock.Unlock()
         m.hash2block[hash] = block
     }else{
         return errors.New("block's father not found")
@@ -239,6 +224,7 @@ func (m *Miner) GetBalance()map[string]int{
 
 func (m *Miner) Init(){
     //I don't 
+    m.cached = true
     ok := false
     m.hash2block[InitHash] = &Block{MyHash:InitHash}
     m.longest = m.hash2block[InitHash]
@@ -293,7 +279,7 @@ func (m *Miner) mainLoop(service *Service) error{
         fmt.Println("=========main loop========")
         select {
             case addedBlock := <- isAdded:
-                fmt.Println("getNew", addedBlock)
+                fmt.Println("getNew")
                 if addedBlock.GetHeight() > m.longest.GetHeight(){
                     e := m.VerifyBlock(addedBlock)
                     //place where we change the consensus
@@ -304,7 +290,7 @@ func (m *Miner) mainLoop(service *Service) error{
                         stopSelectTrans <- 1 //so that pending would release lock
 
                         //we need stop other verifier, otherwise their databse would be wrong
-                        fmt.Println("Update longest")
+                        fmt.Println("Update longest", addedBlock.GetHeight())
                         m.UpdateLongest(addedBlock)
 
                         go m.transfers.GetBlocksByBalance(database, waitBlocks, stopSelectTrans)
@@ -342,7 +328,6 @@ func (m *Miner) mainLoop(service *Service) error{
                 fmt.Println("In push block")
                 service.PushBlockResponse <- true
                 newBlocks = PushedBlock
-                fmt.Println(newBlocks)
             case GetBlockHash := <- service.GetBlockRequest:
                 fmt.Println("In GetBlock")
                 block, ok := m.hash2block[GetBlockHash]
