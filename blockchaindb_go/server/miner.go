@@ -267,7 +267,7 @@ func (m *Miner) AddBlockWithoutCheck(block *Block, finish chan *Block){
     finish <- block
 }
 
-func (m *Miner) mainLoop() error{
+func (m *Miner) mainLoop(service *Service) error{
     m.Init()
 
     waitBlocks := make(chan *Block, 50)
@@ -277,9 +277,7 @@ func (m *Miner) mainLoop() error{
     var stop_solve chan int
 
     toSolve := make([]*Block, 0)
-
     isAdded := make(chan *Block, 50)
-    server_query := make(chan int) //stands for all serveer query
 
     database := NewDatabaseEngine(m.databaseLongest)
     go m.transfers.GetBlocksByBalance(database, waitBlocks, stopSelectTrans)
@@ -319,6 +317,7 @@ func (m *Miner) mainLoop() error{
                 }
 
             case block := <- waitBlocks:
+                block.MinerID = "xxxx"
                 toSolve = append(toSolve, block)
                 if stop_solve == nil{
                     stop_solve = make(chan int)
@@ -326,7 +325,21 @@ func (m *Miner) mainLoop() error{
                     go block.Solve(stop_solve, is_solved)
                     toSolve = toSolve[1:]
                 }
-            case _ = <-server_query:
+            case UserID := <- service.GetRequest:
+                service.GetResponse <- m.database.Get(UserID)
+            case UserID := <- service.VerifyRequest:
+                //I don't know how to do it
+            case PushedBlock := <- service.PushBlockRequest:
+                newBlocks = PushedBlock
+                service.PushBlockResponse <- true
+            case GetBlockHash := <- service.GetBlockRequest:
+                block, ok := m.hash2block[GetBlockHash]
+                if !ok{
+                    block = nil
+                }
+                service.GetBlockReponse <- block
+            case <-service.GetHeightRequest:
+                service.GetHeightResponse <- m.longest
             case <-time.After(time.Second):
                 //decide wether to start a new block or any other strategy
                 //or do nothing

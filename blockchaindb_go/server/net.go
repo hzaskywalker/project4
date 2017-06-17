@@ -5,6 +5,87 @@
     */
 package main
 
+import (
+    pb "../protobuf/go"
+)
+
+
+type Service{
+    //To receive other's quest
+    GetRequest chan string
+    GetResponse chan int
+    //TRANSFER //handeled by transfer
+    VerifyRequest chan string
+    VerifyResponse chan *Block
+    //PushTransaction 
+    GetHeightRequest chan bool
+    GetHeightResponse chan *pb.GetHeightResponse
+
+    GetBlockRequest chan string
+    GetBlockReponse chan *Block
+
+    PushBlockRequest chan *Block
+    PushBlockResponse chan bool
+}
+
+func NewService() *Service{
+    s = &Service{}
+    s.GetRequest = make(chan string)
+    s.GetResponse = make(chan int)
+    s.VerifyRequest = make(chan string)
+    s.VerifyResponse = make(chan *Block)
+
+    s.GetHeightRequest = make(chan bool)
+    s.GetHeightResponse = make(chan *Block)
+
+    s.GetBlockRequest = make(chan string)
+    s.GetBlockReponse = make(chan *Block)
+
+    s.PushBlockRequest = make(chan *Block)
+    s.PushBlockResponse = make(chan bool)
+    return s
+}
+
+func (s *Service) Get(q *GetRequest)*pb.GetResponse{
+    s.GetRequest <- q.UserId
+    return pb.GetResponse{Value: int32(<-s.GetResponse)}
+}
+
+/*
+func (s *Service) Transfer(in *pb.Transaction) (*pb.BooleanResponse, error) {
+    return &pb.BooleanResponse{Success: true}, nil
+}
+*/
+
+func (s *Service) Verify(in *pb.Transaction) (*pb.VerifyResponse, error) {
+    //We don't need to check other things
+    s.VerifyRequest <- in.UUID
+    ok := <- s.VerifyResponse
+    if ok!=nil {
+        return &pb.VerifyResponse{Result: pb.VerifyResponse_FAILED, BlockHash:ok.GetHash()}, nil
+    }
+}
+
+func (s *Service) PushBlock(in *pb.JsonBlockString) (*pb.Null, error) {
+    block := MakeNewBlock()
+    block.UnmarshalString(in.json)
+
+    PushBlockRequest <- block
+    <- PushBlockResponse
+    //need broad cast
+    return &pb.Null{}, nil
+}
+
+func (s *Service) GetBlock(in *pb.GetBlockRequest) (*pb.JsonBlockString, error) {
+    GetBlockRequest <- in.BlockHash
+    block := <- GetBlockReponse
+    if block == nil{
+        return &pb.Null{}, nil
+    } else{
+        return &pb.JsonBlockString{json:block.MarshalToString()}, nil
+    }
+}
+
 type Server interface{
     GetHeight()(int, *Block, bool)
     GetBlock(hash string)(*Block, bool)

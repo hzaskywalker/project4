@@ -31,8 +31,10 @@ func TestMainLoop(){
 
     miner := NewMiner(&s)
     go miner.mainLoop()
+
+    prev := miner.longest
     for ;;{
-        block := s.GenerateNewBlock(s.longest.GetHash(), 54, true)
+        block := s.GenerateNewBlock(prev, 54, true)
         //fmt.Println(s.blocks[block.PrevHash].Transactions)
         fmt.Println("sender")
         s.sender <- block
@@ -44,7 +46,7 @@ func TestMainLoop(){
         } else{
             fmt.Println("Success")
         }
-        s.longest = block
         break
     }
+    s.longest := s.GenerateNewBlock(s.longest.GetHash(), 203, true)
 }
