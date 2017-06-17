@@ -2,7 +2,7 @@ package main
 
 /*
 About transfer:
-    1. We have a pool of transaction, with some on longest (type 0) and some on pending (type 1)
+    1. We have a pool of transaction, with some on longest (type 0) and some on pending (type 1), new (type 2)
     2. type 0 would change only when changing longest, new comer become type 1
 
     3. Miner would have a thread that receive all of the things of type 1 and the new comer.
@@ -44,33 +44,30 @@ type TransHouse map[string]*Transaction
 type TransferManager struct{
     server TransferServer
 
-    dict TransHouse
-    lock sync.RWMutex
+    dict [3]TransHouse
+    lock [3]sync.RWMutex
 
     //need something to maintain all transaction with flag = 1
     //use map to implement set
-    Pending TransHouse
-    PendingLock sync.RWMutex
-    stopProducer chan bool
-
-    PendingNotEmpty *sync.Cond
-    channel chan *Transaction
+    //stopProducer chan bool
+    //channel chan *Transaction
 }
 
-func (T *TransferManager)GetDictSize()int{
+/*func (T *TransferManager)GetDictSize()int{
     return len(T.dict)
 }
 
 func (T *TransferManager)GetPendingSize()int{
     //unsafe, only for debug
     return len(T.Pending)
-}
+}*/
 
 func NewTransferManager(_server TransferServer)*TransferManager{
-    T := &TransferManager{server: _server, 
-        Pending: make(TransHouse),
-        dict: make(TransHouse)}
-    T.PendingNotEmpty = sync.NewCond(&T.PendingLock)
+    T := &TransferManager{server: _server}
+	for i:=0;i<3;i++{
+		T.dict[i] = make(TransHouse)
+	}
+    //T.PendingNotEmpty = sync.NewCond(&T.PendingLock)
 
     //go T.Producer() may need add again
     return T
@@ -78,26 +75,74 @@ func NewTransferManager(_server TransferServer)*TransferManager{
 
 func (T *TransferManager)SetFlag(t *Transaction, flag int){
     //set the flag into Pending
-    if flag == 1 && t.flag!=1 {
-        T.PendingLock.Lock()
-        defer T.PendingLock.Unlock()
-
-        T.Pending[t.UUID] = t
-        t.flag = flag
-
-        T.PendingNotEmpty.Signal()
-    }else{
-        if t.flag == 1 && flag!=1{
-            T.PendingLock.Lock()
-            defer T.PendingLock.Unlock()
-
-            delete(T.Pending, t.UUID)
-        }
-        t.flag = flag
-    }
+	if flag == t.flag{
+		return
+	}
+	//T.lock[t.flag].Lock()
+	delete(T.dict[t.flag], t.UUID)
+	//T.lock[t.flag].UnLock()
+	t.flag = flag
+	//T.lock[t.flag].Lock()
+	T.dict[t.flag][t.UUID] = t
+	//T.lock[t.flag].UnLock()
 }
 
-func (T *TransferManager)GetPending()*Transaction{
+func (T *TransferManager)AddPending(t *Transaction){
+	T.lock[2].Lock()
+	t.flag = 2
+	T.dict[2][t.UUID] = t
+	T.lock[2].UnLock()
+}
+
+func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result chan *Block, stop chan int){
+	for ;;{
+		if len(T.dict[2])>0{
+			//T.lock[2].Lock()
+			//T.lock[1].Lock()
+			for _, t := range T.dict[2]{
+				t.flag = 1
+				T.dict[1][t.UUID] = t
+			}
+			T.dict[2] = make(TransHouse)
+			//T.lock[1].UnLock()
+			//T.lock[2].UnLock()
+		}
+		block := MakeNewBlock()
+		mining_total := 0
+		for _, t_ := range T.dict[1]{
+			select {
+				case signal := <- stop:
+					if signal == 1{
+						return
+					}
+				default:
+					t := t_.trans
+					if t.Value > database.Get(t.FromID){
+						continue
+					}
+					database.Transfer(t.FromID, t.ToID, int(t.Value), int(t.Value - t.MiningFee))
+					mining_total = mining_total + int(t.MiningFee)
+					block.Transactions = append(block.Transactions, t)
+					if len(block.Transactions) == 50{
+						break
+					}
+			}
+		}
+		if len(block.Transactions)>0{
+			database.Add(block.MinerID, mining_total)
+			return block
+		}
+	}
+}
+
+func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result chan *Block, stop chan int){
+    T.server.GetBlocksByBalance(database, result, stop)
+}
+
+
+
+
+/*func (T *TransferManager)GetPending()*Transaction{
     T.PendingLock.Lock()
     defer T.PendingLock.Unlock()
     for ;len(T.Pending)==0;{
@@ -169,7 +214,7 @@ func (T* TransferManager)Producer(){
         if T.ReadWriteTransaction(t){
         }
     }
-}
+}*/
 
 /*
 func (T* TransferManager)Producer(){
@@ -245,6 +290,3 @@ func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result cha
     }
 }
 */
-func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result chan *Block, stop chan int){
-    T.server.GetBlocksByBalance(database, result, stop)
-}
