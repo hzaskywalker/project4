@@ -111,7 +111,7 @@ func (b *Block) Unmarshal(data string){
     block := new(pb.Block)
     e := jsonpb.UnmarshalString(data, block)
     if e!=nil{
-        fmt.Print(e)
+        fmt.Print("++++++++++++++++++++++++++++++++++++", e)
         os.Exit(1)
     }
 

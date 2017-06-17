@@ -4,6 +4,9 @@ import (
     "fmt"
     "time"
     "math/rand"
+    "../hash"
+    "os"
+    pb "../protobuf/go"
 )
 
 func (s *MyServer)GetBlocksByBalance(database *DatabaseEngine, results chan *Block, stop chan int) {
@@ -30,11 +33,27 @@ func TestMainLoop(){
     //fmt.Println(s.CalcBalance(s.longest.GetHash()))
 
     miner := NewMiner(&s)
-    go miner.mainLoop()
 
+    service := NewService()
+    go miner.mainLoop(service)
+
+    for ;miner.longest == nil;{
+        <- time.After(time.Second)
+    }
     prev := miner.longest
+
+    hash1 := hash.GetHashString(prev.MarshalToString())
+    tmp := MakeNewBlock()
+    tmp.Unmarshal(prev.MarshalToString())
+    hash2 := hash.GetHashString(tmp.MarshalToString())
+    if hash1 != hash2{
+        fmt.Println(hash1)
+        fmt.Println(hash2)
+        fmt.Println("hash unequal")
+        os.Exit(1)
+    }
     for ;;{
-        block := s.GenerateNewBlock(prev, 54, true)
+        block := s.GenerateNewBlock(prev.GetHash(), 156, true)
         //fmt.Println(s.blocks[block.PrevHash].Transactions)
         fmt.Println("sender")
         s.sender <- block
@@ -48,5 +67,19 @@ func TestMainLoop(){
         }
         break
     }
-    s.longest := s.GenerateNewBlock(s.longest.GetHash(), 203, true)
+    s.longest = s.GenerateNewBlock(s.longest.GetHash(), 203, true)
+    service.PushBlock(&pb.JsonBlockString{Json:s.longest.MarshalToString()})
+    <- time.After(time.Second)
+
+    res := CompareBalance(miner.GetBalance(), s.CalcBalance( s.longest.GetHash()) )
+    if !res{
+        fmt.Println("Wrong balance after push block")
+        os.Exit(1)
+    } else{
+        fmt.Println("Success Push Block")
+    }
+    for ;;{
+        //golang has trouble for infinite loop
+        <- time.After(time.Second)
+    }
 }

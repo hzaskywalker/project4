@@ -264,6 +264,7 @@ func (m *Miner) Init(){
 
 func (m *Miner) AddBlockWithoutCheck(block *Block, finish chan *Block){
     m.InsertBlock(block)
+    fmt.Println("finish")
     finish <- block
 }
 
@@ -282,13 +283,17 @@ func (m *Miner) mainLoop(service *Service) error{
     database := NewDatabaseEngine(m.databaseLongest)
     go m.transfers.GetBlocksByBalance(database, waitBlocks, stopSelectTrans)
 
+
     var newBlocks *Block
     for ;; {
         newBlocks = nil
+        //fmt.Println(isAdded, is_solved, waitBlocks, service.GetRequest, service.VerifyRequest, service.PushBlockRequest)
+        //fmt.Println(service.GetBlockRequest, service.GetHeightRequest)
 
         fmt.Println("=========main loop========")
         select {
             case addedBlock := <- isAdded:
+                fmt.Println("getNew", addedBlock)
                 if addedBlock.GetHeight() > m.longest.GetHeight(){
                     e := m.VerifyBlock(addedBlock)
                     //place where we change the consensus
@@ -306,10 +311,10 @@ func (m *Miner) mainLoop(service *Service) error{
                     }
                 }
             case solved := <- is_solved:
+                fmt.Println("In Solved")
                 newBlocks = solved
                 stop_solve <- 1
                 stop_solve = nil
-                fmt.Println("solved")
                 if len(toSolve) > 0{
                     stop_solve = make(chan int)
                     go toSolve[0].Solve(stop_solve, is_solved)
@@ -317,7 +322,8 @@ func (m *Miner) mainLoop(service *Service) error{
                 }
 
             case block := <- waitBlocks:
-                block.MinerID = "xxxx"
+                fmt.Println("In waitBlock")
+                //block.MinerID = "xxxx"
                 toSolve = append(toSolve, block)
                 if stop_solve == nil{
                     stop_solve = make(chan int)
@@ -326,27 +332,37 @@ func (m *Miner) mainLoop(service *Service) error{
                     toSolve = toSolve[1:]
                 }
             case UserID := <- service.GetRequest:
-                service.GetResponse <- m.database.Get(UserID)
-            case UserID := <- service.VerifyRequest:
+                fmt.Println("In GetRequest")
+                val, _ := m.databaseLongest.Get(UserID)
+                service.GetResponse <- val
+            case _ = <- service.VerifyRequest:
+                fmt.Println("In verify")
                 //I don't know how to do it
             case PushedBlock := <- service.PushBlockRequest:
-                newBlocks = PushedBlock
+                fmt.Println("In push block")
                 service.PushBlockResponse <- true
+                newBlocks = PushedBlock
+                fmt.Println(newBlocks)
             case GetBlockHash := <- service.GetBlockRequest:
+                fmt.Println("In GetBlock")
                 block, ok := m.hash2block[GetBlockHash]
                 if !ok{
                     block = nil
                 }
                 service.GetBlockReponse <- block
             case <-service.GetHeightRequest:
+                fmt.Println("In GetHeight")
                 service.GetHeightResponse <- m.longest
-            case <-time.After(time.Second):
+            case <- time.After(time.Second):
                 //decide wether to start a new block or any other strategy
                 //or do nothing
         }
 
         if newBlocks!=nil {
+            fmt.Println("is added", isAdded)
             go m.AddBlockWithoutCheck(newBlocks, isAdded)
         }
     }
+    fmt.Println("End mainloop")
+    return nil
 }

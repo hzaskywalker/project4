@@ -10,7 +10,7 @@ import (
 )
 
 
-type Service{
+type Service struct{
     //To receive other's quest
     GetRequest chan string
     GetResponse chan int
@@ -19,7 +19,7 @@ type Service{
     VerifyResponse chan *Block
     //PushTransaction 
     GetHeightRequest chan bool
-    GetHeightResponse chan *pb.GetHeightResponse
+    GetHeightResponse chan *Block
 
     GetBlockRequest chan string
     GetBlockReponse chan *Block
@@ -29,7 +29,7 @@ type Service{
 }
 
 func NewService() *Service{
-    s = &Service{}
+    s := &Service{}
     s.GetRequest = make(chan string)
     s.GetResponse = make(chan int)
     s.VerifyRequest = make(chan string)
@@ -46,9 +46,9 @@ func NewService() *Service{
     return s
 }
 
-func (s *Service) Get(q *GetRequest)*pb.GetResponse{
-    s.GetRequest <- q.UserId
-    return pb.GetResponse{Value: int32(<-s.GetResponse)}
+func (s *Service) Get(q *pb.GetRequest)*pb.GetResponse{
+    s.GetRequest <- q.UserID
+    return &pb.GetResponse{Value: int32(<-s.GetResponse)}
 }
 
 /*
@@ -61,28 +61,26 @@ func (s *Service) Verify(in *pb.Transaction) (*pb.VerifyResponse, error) {
     //We don't need to check other things
     s.VerifyRequest <- in.UUID
     ok := <- s.VerifyResponse
-    if ok!=nil {
-        return &pb.VerifyResponse{Result: pb.VerifyResponse_FAILED, BlockHash:ok.GetHash()}, nil
-    }
+    return &pb.VerifyResponse{Result: pb.VerifyResponse_FAILED, BlockHash:ok.GetHash()}, nil
 }
 
 func (s *Service) PushBlock(in *pb.JsonBlockString) (*pb.Null, error) {
     block := MakeNewBlock()
-    block.UnmarshalString(in.json)
+    block.Unmarshal(in.Json)
 
-    PushBlockRequest <- block
-    <- PushBlockResponse
+    s.PushBlockRequest <- block
+    <- s.PushBlockResponse
     //need broad cast
     return &pb.Null{}, nil
 }
 
 func (s *Service) GetBlock(in *pb.GetBlockRequest) (*pb.JsonBlockString, error) {
-    GetBlockRequest <- in.BlockHash
-    block := <- GetBlockReponse
+    s.GetBlockRequest <- in.BlockHash
+    block := <- s.GetBlockReponse
     if block == nil{
-        return &pb.Null{}, nil
+        return nil, nil
     } else{
-        return &pb.JsonBlockString{json:block.MarshalToString()}, nil
+        return &pb.JsonBlockString{Json:block.MarshalToString()}, nil
     }
 }
 
