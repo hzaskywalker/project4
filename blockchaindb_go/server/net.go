@@ -69,7 +69,7 @@ func checkBlock(block *Block)bool{
     return true
 }
 
-func checkHahsBlock(blockhash string, block *Block)bool{
+func checkHashBlock(blockhash string, block *Block)bool{
     return checkBlock(block) && hash.GetHashString(block.MarshalToString()) == blockhash
 }
 
@@ -91,6 +91,8 @@ type Service struct{
     PushBlockResponse chan bool
 
     Hello chan bool
+	
+	transfer *TransferManager
 }
 
 func NewService() *Service{
@@ -113,13 +115,15 @@ func NewService() *Service{
     return s
 }
 
-func (s *Service) Get(q *pb.GetRequest)*pb.GetResponse{
+func (s *Service) Get(q *pb.GetRequest) (*pb.GetResponse, error) {
     if !checkUserID(q.UserID){
-        return &pb.GetResponse{Value: -1}
+        return &pb.GetResponse{Value: -1}, nil
     }
     s.GetRequest <- q.UserID
-    return &pb.GetResponse{Value: int32(<-s.GetResponse)}
+    return &pb.GetResponse{Value: int32(<-s.GetResponse)}, nil
 }
+
+
 
 /*
 func (s *Service) Transfer(in *pb.Transaction) (*pb.BooleanResponse, error) {
@@ -164,6 +168,19 @@ func (s *Service) GetBlock(in *pb.GetBlockRequest) (*pb.JsonBlockString, error) 
     } else{
         return &pb.JsonBlockString{Json:block.MarshalToString()}, nil
     }
+}
+
+func (s *Service) GetHeight(in *pb.Null) (*pb.GetHeightResponse, error) {
+    //return &pb.GetHeightResponse{Height: 1, LeafHash: "?"}, nil
+	s.GetHeightRequest <- true
+	block := s.GetHeightResponse
+	height := block.BlockID
+    return &pb.GetHeightResponse{Height: height, LeafHash: block.GetHash()}, nil
+	
+}
+
+func (s *Service) Transfer(in *pb.Transaction) (*pb.BooleanResponse, error) {
+	s.transfer.AddPending(in)
 }
 
 type Server interface{

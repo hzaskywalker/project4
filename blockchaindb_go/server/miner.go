@@ -254,6 +254,20 @@ func (m *Miner) AddBlockWithoutCheck(block *Block, finish chan *Block){
     finish <- block
 }
 
+func (m *Miner)GetBlocksByBalance(database *DatabaseEngine, result chan *Block, stop chan int){
+    stop_ := make(chan bool)
+    for ;;{
+        select{
+            case <- stop:
+                stop_ <-
+                return
+            case res := <- m.transfers.GetBlocksByBalance(database, result, stop_)
+                result <- res
+            case time.After(time.Second * 10):
+        }
+    }
+}
+
 func (m *Miner) mainLoop(service *Service) error{
     m.Init()
 
@@ -283,10 +297,12 @@ func (m *Miner) mainLoop(service *Service) error{
                     e := m.VerifyBlock(addedBlock)
                     //place where we change the consensus
                     if e == nil{
-                        if stop_solve != nil{
-                            stop_solve <- 1 //stop solving
+                        if true{
+                            if stop_solve != nil{
+                                stop_solve <- 1 //stop solving
+                            }
+                            stopSelectTrans <- 1 //so that pending would release lock
                         }
-                        stopSelectTrans <- 1 //so that pending would release lock
 
                         //we need stop other verifier, otherwise their databse would be wrong
                         fmt.Println("Update longest", addedBlock.GetHeight())
