@@ -87,6 +87,8 @@ type Service struct{
 
     PushBlockRequest chan *Block
     PushBlockResponse chan bool
+
+    Hello chan bool
 }
 
 func NewService() *Service{
@@ -104,6 +106,8 @@ func NewService() *Service{
 
     s.PushBlockRequest = make(chan *Block)
     s.PushBlockResponse = make(chan bool)
+
+    s.Hello = make(chan bool, 1)
     return s
 }
 

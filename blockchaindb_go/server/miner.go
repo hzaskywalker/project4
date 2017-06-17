@@ -276,10 +276,9 @@ func (m *Miner) mainLoop(service *Service) error{
         //fmt.Println(isAdded, is_solved, waitBlocks, service.GetRequest, service.VerifyRequest, service.PushBlockRequest)
         //fmt.Println(service.GetBlockRequest, service.GetHeightRequest)
 
-        fmt.Println("=========main loop========")
         select {
             case addedBlock := <- isAdded:
-                fmt.Println("getNew")
+                //fmt.Println("getNew")
                 if addedBlock.GetHeight() > m.longest.GetHeight(){
                     e := m.VerifyBlock(addedBlock)
                     //place where we change the consensus
@@ -297,7 +296,7 @@ func (m *Miner) mainLoop(service *Service) error{
                     }
                 }
             case solved := <- is_solved:
-                fmt.Println("In Solved")
+                //fmt.Println("In Solved")
                 newBlocks = solved
                 stop_solve <- 1
                 stop_solve = nil
@@ -308,39 +307,41 @@ func (m *Miner) mainLoop(service *Service) error{
                 }
 
             case block := <- waitBlocks:
-                fmt.Println("In waitBlock")
+                //fmt.Println("In waitBlock")
                 //block.MinerID = "xxxx"
                 toSolve = append(toSolve, block)
                 if stop_solve == nil{
                     stop_solve = make(chan int)
-                    fmt.Println("start solve")
+                    //fmt.Println("start solve")
                     go block.Solve(stop_solve, is_solved)
                     toSolve = toSolve[1:]
                 }
             case UserID := <- service.GetRequest:
-                fmt.Println("In GetRequest")
+                //fmt.Println("In GetRequest")
                 val, _ := m.databaseLongest.Get(UserID)
                 service.GetResponse <- val
             case _ = <- service.VerifyRequest:
-                fmt.Println("In verify")
+                //fmt.Println("In verify")
                 //I don't know how to do it
             case PushedBlock := <- service.PushBlockRequest:
-                fmt.Println("In push block")
+                //fmt.Println("In push block")
                 service.PushBlockResponse <- true
                 newBlocks = PushedBlock
             case GetBlockHash := <- service.GetBlockRequest:
-                fmt.Println("In GetBlock")
+                //fmt.Println("In GetBlock")
                 block, ok := m.hash2block[GetBlockHash]
                 if !ok{
                     block = nil
                 }
                 service.GetBlockReponse <- block
             case <-service.GetHeightRequest:
-                fmt.Println("In GetHeight")
+                //fmt.Println("In GetHeight")
                 service.GetHeightResponse <- m.longest
             case <- time.After(time.Second):
                 //decide wether to start a new block or any other strategy
                 //or do nothing
+            case <- service.Hello:
+                fmt.Println("Hello world")
         }
 
         if newBlocks!=nil {

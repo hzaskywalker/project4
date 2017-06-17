@@ -2,13 +2,14 @@ package main
 
 import (
     "os"
+    "fmt"
     "io/ioutil"
 )
 
 func WriteJson(hash, Json string){
     w, e := os.Create(hash + ".json")
     defer w.Close()
-    if e == nil{
+    if e != nil{
         return
     }
     _, _ = w.Write([]byte(Json))
@@ -28,6 +29,7 @@ func ReadFromDisck(hash string)(*Block, bool){
     if e!=nil{
         return nil, false
     }
+    fmt.Println("Read Json from dist: ", hash)
     return block, true
 }
 
