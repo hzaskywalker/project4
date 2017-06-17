@@ -25,7 +25,6 @@ type TransferServer interface{
 
 type Transaction struct{
     flag int //state of the transaction, sucess(0), Pending(1), or not in longest (2)
-    UUID string
     trans *pb.Transaction
 }
 
@@ -34,7 +33,7 @@ func NewTransaction()*Transaction{
 }
 
 func (t *Transaction) String()string{
-    return fmt.Sprintf("UUID: %s: From %s, To %s, Value: %d", t.UUID, t.trans.FromID, t.trans.ToID, int(t.trans.Value))
+    return fmt.Sprintf("UUID: %s: From %s, To %s, Value: %d", t.trans.UUID, t.trans.FromID, t.trans.ToID, int(t.trans.Value))
 }
 
 
@@ -79,18 +78,18 @@ func (T *TransferManager)SetFlag(t *Transaction, flag int){
 		return
 	}
 	//T.lock[t.flag].Lock()
-	delete(T.dict[t.flag], t.UUID)
+	delete(T.dict[t.flag], t.trans.UUID)
 	//T.lock[t.flag].UnLock()
 	t.flag = flag
 	//T.lock[t.flag].Lock()
-	T.dict[t.flag][t.UUID] = t
+	T.dict[t.flag][t.trans.UUID] = t
 	//T.lock[t.flag].UnLock()
 }
 
-func (T *TransferManager)AddPending(t *Transaction){
+func (T *TransferManager)AddPending(t_ *pb.Transaction){
+	t := Transaction{flag: 2, trans: t_}
 	T.lock[2].Lock()
-	t.flag = 2
-	T.dict[2][t.UUID] = t
+	T.dict[2][t.trans.UUID] = t
 	T.lock[2].UnLock()
 }
 
@@ -101,7 +100,7 @@ func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result cha
 			//T.lock[1].Lock()
 			for _, t := range T.dict[2]{
 				t.flag = 1
-				T.dict[1][t.UUID] = t
+				T.dict[1][t.trans.UUID] = t
 			}
 			T.dict[2] = make(TransHouse)
 			//T.lock[1].UnLock()
