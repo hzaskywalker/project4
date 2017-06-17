@@ -9,6 +9,8 @@ type Server interface{
     GetHeight()(int, *Block, bool)
     GetBlock(hash string)(*Block, bool)
     TRANSFER()*Transaction
+
+    GetBlocksByBalance(*DatabaseEngine, chan *Block, chan int)
 }
 
 type RealServer struct{

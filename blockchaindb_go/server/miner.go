@@ -38,7 +38,7 @@ import (
     "errors"
     "fmt"
     "time"
-    "sync"
+    //"sync"
     "os"
     "../hash"
 )
@@ -51,7 +51,7 @@ type Miner struct{
     longest *Block
 
     //database handle the balance of each person
-    database *DatabaseEngine
+    databaseLongest *DatabaseEngine
 
     //transfers handles transactions
     transfers *TransferManager
@@ -62,11 +62,9 @@ type Miner struct{
 func NewMiner(server_ Server) Miner{
     m := Miner{
         hash2block: make(map[string]*Block),
-        database: NewDatabaseEngine(),
+        databaseLongest: NewDatabaseEngine(nil),
         server: server_,
         transfers: NewTransferManager(server_)}
-
-    go m.transfers.Producer()
     return m
 }
 
@@ -176,16 +174,15 @@ func (m *Miner) UpdateBalance(database *DatabaseEngine, block *Block, updateStat
     }
 
     for i:=len(b)-1;i>=0;i--{
-        if m.database.UpdateBalance(b[i], 1){
+        if database.UpdateBalance(b[i], 1){
             if updateStatus{
                 m.transfers.UpdateBlockStatus(b[i], 0)
                 //it's done only when we change longest which has been verified 
             }
         }else{
             for j:=i+1;j<=len(b)-1;j++{
-                m.database.UpdateBalance(b[i], -1)
+                database.UpdateBalance(b[i], -1)
             }
-            m.currentDataBase = lca
             return errors.New("Get error on calculating balance")
         }
     }
@@ -195,7 +192,7 @@ func (m *Miner) UpdateBalance(database *DatabaseEngine, block *Block, updateStat
 
 func (m *Miner) UpdateLongest(block *Block)error{
     if m.longest.GetHeight() < block.GetHeight() {
-        e := m.UpdateBalance(m.databse, block, true)
+        e := m.UpdateBalance(m.databaseLongest, block, true)
         if e!=nil{
             fmt.Println(e)
             return e
@@ -206,13 +203,13 @@ func (m *Miner) UpdateLongest(block *Block)error{
 }
 
 func (m *Miner) VerifyBlock(block *Block)error{
-    database := NewDatabaseEngine(m.database)
+    database := NewDatabaseEngine(m.databaseLongest)
     e := m.UpdateBalance(database, block, false)
 
     if e == nil{
         return nil
-    }else{
-        m.hash2block[hash] = nil
+    } else{
+        m.hash2block[block.GetHash()] = nil
         return errors.New("block balance wrong")
     }
 }
@@ -226,35 +223,36 @@ func (m *Miner) InsertBlock(block *Block)error{
     }else{
         return errors.New("block's father not found")
     }
+    return nil
 }
 
 func (m *Miner) GetBalance()map[string]int{
     //lock currentDataBase
-    if m.currentDataBase != m.longest{
-        m.UpdateBalance(m.longest, false)
+    if m.databaseLongest.block != m.longest{
+        fmt.Println("In miner:GetBalance() m.databaseLongest.block != m.longest")
+        os.Exit(1)
     }
-    return m.database.GetBalance()
+    return m.databaseLongest.GetBalance()
 }
 
 func (m *Miner) Init(){
     //I don't 
-    go m.transfers.Producer()
     ok := false
     m.hash2block[InitHash] = &Block{MyHash:InitHash}
     m.longest = m.hash2block[InitHash]
-    m.currentDataBase = m.hash2block[InitHash]
     m.longest.BlockID = 0
 
     var newLongest *Block
     for ;!ok;{
         _, newLongest, ok = m.ServerGetHeight()
     }
+    fmt.Println("start insert")
     e := m.InsertBlock(newLongest)//longest would not be calculated
     if e!=nil{
         fmt.Println(e)
         os.Exit(1)
     }
-    e := m.VerifyBlock(newLongest)
+    e = m.VerifyBlock(newLongest)
     if e!=nil{
         fmt.Println(e)
         os.Exit(1)
@@ -271,45 +269,43 @@ func (m *Miner) mainLoop() error{
     waitBlocks := make(chan *Block, 50)
     stopSelectTrans := make(chan int)
 
-    is_solved := make(chan int, 50)
+    is_solved := make(chan *Block, 50)
     stop_solve := make(chan int)
 
-    isAdded := make(chan *block, 50)
+    isAdded := make(chan *Block, 50)
     server_query := make(chan int) //stands for all serveer query
 
-    database := NewDatabaseEngine(m.database)
-    go m.transfers(database, waitBlocks, stopSelectTrans)
+    database := NewDatabaseEngine(m.databaseLongest)
+    go m.transfers.GetBlocksByBalance(database, waitBlocks, stopSelectTrans)
 
     for ;; {
         var newBlocks *Block
         newBlocks = nil
 
         select {
-            case addedBlock := <- is_add:
+            case addedBlock := <- isAdded:
                 if addedBlock.GetHeight() > m.longest.GetHeight(){
-                    e := VerifyBlock(addedBlock)//place where we change the consensus
+                    e := m.VerifyBlock(addedBlock)//place where we change the consensus
                     if e == nil{
                         stop_solve <- 1 //stop solving
                         stopSelectTrans <- 1 //so that pending would release lock
                         m.UpdateLongest(addedBlock)
 
-                        go m.transfers.GetBlocksByBalance()
+                        go m.transfers.GetBlocksByBalance(database, waitBlocks, stopSelectTrans)
                     }
                 }
             case solved := <- is_solved:
-                newBlocks = solvingBlock
-            case block := <- waitBlocks{
-                go block.Solve(stop_solve, is_add)
-            }
-            case s := <-server_query{
-            }
+                newBlocks = solved
+            case block := <- waitBlocks:
+                go block.Solve(stop_solve, isAdded)
+            case _ = <-server_query:
             case <-time.After(time.Second):
                 //decide wether to start a new block or any other strategy
                 //or do nothing
         }
 
-        if newBlocks{
-            go m.AddBlockWithoutCheck(newBlocks, is_add)
+        if newBlocks!=nil {
+            go m.AddBlockWithoutCheck(newBlocks, isAdded)
         }
     }
 }

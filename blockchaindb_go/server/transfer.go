@@ -19,6 +19,7 @@ import (
 
 type TransferServer interface{
     TRANSFER()*Transaction
+    GetBlocksByBalance(*DatabaseEngine, chan *Block, chan int)
 }
 
 
@@ -162,6 +163,7 @@ func (T *TransferManager)UpdateBlockStatus(block *Block, flag int){
     }
 }
 
+/*
 func (T* TransferManager)Producer(){
     for {
         select {
@@ -211,7 +213,7 @@ func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result cha
     block := MakeNewBlock()
     for ;;{
         select {
-            case t := <- T.channel
+            case t := <- T.channel:
                 //I also need to check UUID
                 if t.Value > database.Get(t.FromID){
                     continue
@@ -221,8 +223,8 @@ func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result cha
                 block.Transactions = append(block.Transactions, t)
 
                 if len(block.Transactions) == 50{ //Or stop
-                    for _, t:=block.Transactions{
-                        database.Add(block.MinerID, int(t.MiningFee))
+                    for _, tmp:=range block.Transactions{
+                        database.Add(block.MinerID, int(tmp.MiningFee))
                     }
                     result <- block
                     block = MakeNewBlock()
@@ -233,4 +235,8 @@ func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result cha
                 return
         }
     }
+}
+*/
+func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result chan *Block, stop chan int){
+    T.server.GetBlocksByBalance(database, result, stop)
 }

@@ -16,9 +16,7 @@ Question:
 
 
 import (
-    "sync"
     "fmt"
-    //"errors"
 )
 
 type Balance map[string]int
@@ -52,9 +50,8 @@ func (db *DatabaseEngine)Add(userId string, delta int)bool{
     if !ok{
         if db.fa ==nil {
             val = db.initValue
-        }
-        else{
-            val = db.fa.Get(userId)
+        }else{
+            val, _ = db.fa.Get(userId)
         }
     }
 	val += delta
@@ -82,9 +79,8 @@ func (db *DatabaseEngine)Get(userId string)(int, bool){
     if !ok{
         if db.fa == nil{
             val = db.initValue
-        }
-        else {
-            val = db.fa.Get(userId)
+        } else {
+            val, _ = db.fa.Get(userId)
         }
         db.balance[userId] = val
         ok = true

@@ -215,12 +215,12 @@ func (s *MyServer)GetHeight()(int, *Block, bool){
 }
 
 func TestDatabaseEngine(s *MyServer){
-    D := NewDatabaseEngine()
+    D := NewDatabaseEngine(nil)
 
     blocks := s.GenerateChain(s.longest.GetHash())
 
     for i:=0;i<len(blocks);i++{
-        D.UpdateBalance(blocks[i], 1, true)
+        D.UpdateBalance(blocks[i], 1)
     }
     fmt.Println("Check forward result: ", CompareBalance(D.GetBalance(), s.CalcBalance(s.longest.GetHash())))
 
@@ -230,11 +230,11 @@ func TestDatabaseEngine(s *MyServer){
         aim := rand.Intn(len(blocks)+1)
         if now>aim{
             for j:=now-1;j>=aim;j--{
-                D.UpdateBalance(blocks[j], -1, true)
+                D.UpdateBalance(blocks[j], -1)
             }
         }else{
             for j:=now;j<aim;j++{
-                D.UpdateBalance(blocks[j], 1, true)
+                D.UpdateBalance(blocks[j], 1)
             }
         }
         //fmt.Println("block", now, "to", aim)
@@ -253,6 +253,9 @@ func TestDatabaseEngine(s *MyServer){
         }
     }
     //TODO: check the code for incorrect block
+}
+
+func (*MyServer)GetBlocksByBalance(database *DatabaseEngine, results chan *Block, stop chan int) {
 }
 
 func TestMiner(){

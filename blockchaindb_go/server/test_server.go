@@ -3,8 +3,8 @@ package main
 import (
     "fmt"
     //"math/rand"
-    "time"
-    "sort"
+    //"time"
+    //"sort"
     pb "../protobuf/go"
 )
 
@@ -37,6 +37,7 @@ func GenTransaction(A string, B string, value int, MiningFee int, UUID string)*T
     return t
 }
 
+/*
 func (s *FakeServer)GenTransfers(start int){
     n := len(s.people_id)
     for i:=0;i<50;i++{
@@ -127,3 +128,4 @@ func TestServer() {
     fmt.Print("begin test server\n")
     testProducer()
 }
+*/
