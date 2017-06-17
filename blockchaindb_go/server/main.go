@@ -35,7 +35,6 @@ func (s *server) Verify(ctx context.Context, in *pb.Transaction) (*pb.VerifyResp
     //return &pb.VerifyResponse{Result: pb.VerifyResponse_FAILED, BlockHash:"?"}, nil
 	return s.s.Verify(in)
 }
-
 func (s *server) GetHeight(ctx context.Context, in *pb.Null) (*pb.GetHeightResponse, error) {
     return s.s.GetHeight(in)
 }
@@ -66,7 +65,7 @@ func main() {
     flag.Parse()
     IDstr:=fmt.Sprintf("%d",*id)
 
-    _=fmt.Sprintf("Server%02d",*id) //MinerID=
+    _=fmt.Sprintf("Server%02d",*id)
     _=hash.GetHashString
     
 
@@ -96,6 +95,7 @@ func main() {
 	s := grpc.NewServer()
 	q := RealServer{ctx:context.Background(), rpc:s}
 	miner := NewMiner(&q)
+	miner.MinerID=
 	s.s = NewService{}
 	s.s.transfer = miner.transfer
     pb.RegisterBlockChainMinerServer(s, &server{})
