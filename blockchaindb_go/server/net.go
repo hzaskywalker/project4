@@ -231,7 +231,7 @@ func PushTransaction_client(in *pb.Transaction){
 
 func (s *Service) PushTransaction(in *pb.Transaction) (*pb.Null, error) {
 	if !checkTransaction(in){
-		return &pb.Null{}, nil
+		return &pb.Null{}, errors.New("Push transaction Invalid")
 	}
 	ok := s.transfer.AddPending(in)
 	if ok{
@@ -279,7 +279,7 @@ func (s *Service) GetBlock(in *pb.GetBlockRequest) (*pb.JsonBlockString, error) 
 type Server interface{
     GetHeight()(int, *Block, bool)
     GetBlock(hash string)(*Block, bool)
-	PushBlock(block *Block, success chan bool)
+	PushBlock(block *Block)
     TRANSFER()*Transaction
 
     GetBlocksByBalance(*DatabaseEngine, chan *Block, chan int)
@@ -334,10 +334,9 @@ func (s *RealServer)GetHeight()(int, *Block, bool){
     return -1, nil, false
 }
 
-func (s *RealServer)PushBlock(block *Block, success chan bool){
+func (s *RealServer)PushBlock(block *Block){  //, success chan bool
 	json := block.MarshalToString()
-    hash := block.GetHash()
-    go WriteJson(hash, json)
+    //hash := block.GetHash()
 	//for ;;{
 	for i:=1; i<=int(Dat["nservers"].(float64)); i++{
 		connLock.RLock()
@@ -347,7 +346,7 @@ func (s *RealServer)PushBlock(block *Block, success chan bool){
 		if status==1{
 			_, err := c.PushBlock(context.Background(), &pb.JsonBlockString{Json:json})
 			if err!=nil{
-				success<-true
+				//success<-true
 			}
 		}
 	}

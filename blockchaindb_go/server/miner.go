@@ -25,6 +25,7 @@ type Miner struct{
 
     cached bool
 	MinerID string
+	dataPath string
 }
 
 func NewMiner(server_ Server) Miner{
@@ -51,7 +52,7 @@ func (m *Miner) ServerGetBlock(h string)(*Block, bool){
     //verify that the hash value equal to its real value
 
     if m.cached {
-        block, ok := ReadFromDisck(h)
+        block, ok := ReadFromDisck(h, m.dataPath)
         if ok{
             return block, ok
         }
@@ -61,13 +62,13 @@ func (m *Miner) ServerGetBlock(h string)(*Block, bool){
     if !ok{
         return nil, ok
     }
-    Json := block.MarshalToString()
+    /*Json := block.MarshalToString()
     if GetHashString(Json)!= h{
         fmt.Println("GetBlock's hash is not correct")
         return nil, false
-    }
+    }*/
     if m.cached{
-        go WriteJson(h, Json)
+        go WriteJson(h, Json, m.dataPath)
     }
     return block, true
 }
@@ -337,6 +338,8 @@ func (m *Miner) mainLoop(service *Service) error{
                 //fmt.Println("In Solved")
                 newBlocks = solved
 				stop_solve = nil
+				go WriteBlock(newBlocks, m.dataPath)
+				go m.server.PushBlock(newBlocks)
                 //stop_solve <- 1
                 //stop_solve = nil
                 /*if len(toSolve) > 0{

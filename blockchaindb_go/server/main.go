@@ -7,6 +7,7 @@ import (
     "log"
     "net"
     "flag"
+	"os"
     
     pb "../protobuf/go"
     //"../hash"
@@ -86,7 +87,7 @@ func main() {
 		panic(err)
 	}
 	dat := Dat[IDstr].(map[string]interface{}) // should be dat[myNum] in the future
-	address, _ := fmt.Sprintf("%s:%s", dat["ip"], dat["port"]), fmt.Sprintf("%s",dat["dataDir"])
+	address, dataPath := fmt.Sprintf("%s:%s", dat["ip"], dat["port"]), fmt.Sprintf("%s",dat["dataDir"])
 	
 
     // Bind to port
@@ -110,6 +111,8 @@ func main() {
 	q := RealServer{}  //rpc:s
 	miner := NewMiner(&q)
 	miner.MinerID = minerid
+	miner.dataPath = dataPath
+	os.MkdirAll(dataPath, 0700)
 	s.s.transfer = miner.transfers
     pb.RegisterBlockChainMinerServer(grpc_s, s)
     // Register reflection service on gRPC server.

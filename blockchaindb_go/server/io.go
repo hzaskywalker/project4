@@ -6,8 +6,8 @@ import (
     "io/ioutil"
 )
 
-func WriteJson(hash, Json string){
-    w, e := os.Create(hash + ".block")
+func WriteJson(hash, Json, path string){
+    w, e := os.Create(path + "/" + hash + ".block")
     defer w.Close()
     if e != nil{
         return
@@ -15,12 +15,12 @@ func WriteJson(hash, Json string){
     _, _ = w.Write([]byte(Json))
 }
 
-func WriteBlock(block *Block){
-    WriteJson(block.GetHash(), block.MarshalToString())
+func WriteBlock(block *Block, path string){
+    WriteJson(block.GetHash(), block.MarshalToString(), path)
 }
 
-func ReadFromDisck(hash string)(*Block, bool){
-    str, e:= ioutil.ReadFile(hash + ".block")
+func ReadFromDisck(hash string, path string)(*Block, bool){
+    str, e:= ioutil.ReadFile(path + "/" + hash + ".block")
     if e!=nil{
         return nil, false
     }
