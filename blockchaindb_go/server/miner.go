@@ -8,7 +8,7 @@ import (
     "fmt"
     "time"
     "sync"
-    "os"
+    //"os"
     //"../hash"
 )
 
