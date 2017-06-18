@@ -74,16 +74,19 @@ func (m *Miner) ServerGetBlock(h string)(*Block, bool){
 }
 
 func (m *Miner) GetBlock(hash string)(*Block, bool){
+	fmt.Println("func GetBlock", hash)
     m.mapLock.RLock()
     block, ok := m.hash2block[hash]
     m.mapLock.RUnlock()
-
+	fmt.Println("block, ok=", block, ok)
     if ok && block!=nil{
         return block, ok
     }else if ok && block==nil{
         return nil, false
     }
+	fmt.Println("func GetBlock ask server", hash)
     block2, ok2 := m.ServerGetBlock(hash)
+	fmt.Println("func GetBlock ask server end", hash)
     if ok2 == false{
         return nil, false
     }
@@ -94,6 +97,7 @@ func (m *Miner) GetBlock(hash string)(*Block, bool){
 
 func (m *Miner) Findfather(block *Block) (*Block, error){
 	//if block.PrevHash == InitHash{
+	fmt.Println("Findfather", block.GetHash())
 	if block.BlockID <= 0{
 		return nil, nil  //errors.New("is root")
 	}
@@ -143,11 +147,22 @@ func (m *Miner) UpdateBalance(database *DatabaseEngine, block *Block, updateStat
         return nil
     }
     lca, e := m.LCA(A, block)
+	for A_:=A;A_!=lca; {
+		fmt.Println("A_ LCA", A_.GetHash())
+		A_, e = m.Findfather(A_)
+	}
+	for B_:=block;B_!=lca; {
+		fmt.Println("B_ LCA", B_.GetHash())
+		B_, e = m.Findfather(B_)
+	}
+	fmt.Println("LCA", lca.GetHash())
+	
     if e!=nil{
         return e
     }
 
     for ;A!=lca; {
+		fmt.Println("A LCA", A.GetHash())
         database.UpdateBalance(A, -1)
         if updateStatus{
             m.transfers.UpdateBlockStatus(A, 1)//should all be pendding
@@ -157,10 +172,11 @@ func (m *Miner) UpdateBalance(database *DatabaseEngine, block *Block, updateStat
 
     var b []*Block
     for B:=block;B!=lca; {
+		fmt.Println("B LCA", B.GetHash())
         b = append(b, B)
         B, e = m.Findfather(B)
     }
-
+	fmt.Println("end LCA")
     for i:=len(b)-1;i>=0;i--{
         if database.UpdateBalance(b[i], 1){
             if updateStatus{
@@ -193,12 +209,13 @@ func (m *Miner) UpdateLongest(block *Block)error{
 func (m *Miner) VerifyBlock(block *Block)error{
     //fmt.Println(m.databaseLongest)
     database := NewDatabaseEngine(m.databaseLongest)
+	fmt.Println("func verify")
     e := m.UpdateBalance(database, block, false)
-
+	fmt.Println("func verify end")
     if e == nil{
         return nil
     } else{
-		fmt.Println("verify", block.BlockID)
+		fmt.Println("verify func start", block.BlockID)
         m.mapLock.Lock()
         m.hash2block[block.GetHash()] = nil
         m.mapLock.Unlock()
@@ -208,7 +225,7 @@ func (m *Miner) VerifyBlock(block *Block)error{
 }
 
 func (m *Miner) InsertBlock(block *Block)error{
-    //Insert block, without veryfy and update
+    //Insert block, without verify and update
     hash := block.GetHash()
     _, ok := m.Findfather(block)
     if ok == nil {
@@ -319,6 +336,7 @@ func (m *Miner) mainLoop(service *Service) error{
 				fmt.Println(addedBlock.GetHeight(), m.longest.GetHeight())
                 if addedBlock.GetHeight() > m.longest.GetHeight() || addedBlock.GetHeight() == m.longest.GetHeight() && addedBlock.GetHash() < m.longest.GetHash(){
 					fmt.Println("start verify")
+					fmt.Println(addedBlock.GetHash(), m.longest.GetHash())
                     e := m.VerifyBlock(addedBlock) //It's better to build a verify list
 					fmt.Println("end verify", e)
                     //place where we change the consensus
