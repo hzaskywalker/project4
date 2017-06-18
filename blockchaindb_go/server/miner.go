@@ -257,10 +257,14 @@ func (m *Miner) Init(){
     m.databaseLongest.block = m.longest
 
     var newLongest *Block
-    //for ;!ok;{
-	for i:=0;i<10 && !ok;i++{
+	//<-time.After(time.Second * 5)
+    for ;!CheckServerFinished;{
+		<-time.After(time.Nanosecond * 10000)
+	}
+	for i:=0;i<5 && !ok;i++{
         _, newLongest, ok = m.ServerGetHeight()
     }
+	fmt.Println("ok=",ok)
 	if !ok{
 		//newLongest = m.longest
 		return

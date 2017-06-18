@@ -120,6 +120,8 @@ func (b *Block) Unmarshal(data string)error{
 
 func (b* Block) Solve(stop chan int, solved chan *Block){
     //must be stopped by the caller
+	//fmt.Println("start solve", time.Now())
+	//defer fmt.Println("end solve", time.Now())
     b.Nonce = "XXXXXXXX"
     data := b.MarshalToString()
     index := strings.Index(data, b.Nonce)
@@ -147,10 +149,12 @@ func (b* Block) Solve(stop chan int, solved chan *Block){
             b.MyHash = hashVal
             solved <- b
             //<- stop
+			//fmt.Println("end solve", time.Now(), i)
             return
         }
     }
     <- stop
+	//fmt.Println("forced end solve", time.Now())
 }
 
 func (b *Block) SolveSync()string{

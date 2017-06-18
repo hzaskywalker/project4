@@ -177,8 +177,10 @@ var Conn []*grpc.ClientConn
 var ConnClient []pb.BlockChainMinerClient
 var ConnStatus []int
 var connLock sync.RWMutex
+var CheckServerFinished bool
 func CheckServer(){
 	//check server
+	CheckServerFinished = false
 	for ;;{
 		//fmt.Println("Checking Server")
 		for i:=1; i<=int(Dat["nservers"].(float64)); i++{
@@ -202,9 +204,11 @@ func CheckServer(){
 				ConnStatus[i] = 1
 				Conn[i] = conn
 				ConnClient[i] = pb.NewBlockChainMinerClient(Conn[i])
+				//fmt.Println("connect", i, address)
 			}
 			connLock.Unlock()
 		}
+		CheckServerFinished = true
 		//time.Sleep(2 * time.Second)
 		//fmt.Println("Checking Server Sleep")
 		time.Sleep(10 * time.Second)
@@ -329,22 +333,27 @@ func (s *RealServer)GetBlock(hash string)(*Block, bool){
 }
 
 func (s *RealServer)GetHeight()(int, *Block, bool){
+	//fmt.Println("getheight")
 	for i:=1; i<=int(Dat["nservers"].(float64)); i++{
 		connLock.RLock()
 		status := ConnStatus[i]
 		c := ConnClient[i]
 		connLock.RUnlock()
 		if status==1{
+			//fmt.Println("get: status=1")
 			res, e := c.GetHeight(context.Background(), &pb.Null{})
+			//fmt.Println(i, e)
 			if e!=nil {
 				continue
 			}
 			block, ok := s.GetBlock(res.LeafHash)
 			if ok{
+				//fmt.Println("get: true")
 				return int(block.BlockID), block, true
 			}
 		}
 	}
+	//fmt.Println("get: false")
     return -1, nil, false
 }
 
