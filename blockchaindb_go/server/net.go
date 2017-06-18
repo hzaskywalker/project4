@@ -48,6 +48,18 @@ func checkTransaction(t *pb.Transaction)bool{
     return true
 }
 
+func checkMinerID(id string)bool{
+    if len(id)!=8{
+        return false
+    }
+    s := []byte(id)
+    if s[0]!='S' || s[1] != 'e' || s[2] != 'r' || s[3] != 'v' || s[4] != 'e' || s[5] != 'r'{
+        return false
+    }
+    _, ok := strconv.Atoi(string(s[6:8]))
+    return ok==nil
+}
+
 func checkBlock(block *Block)bool{
     if len(block.Transactions) == 0{
         return false
@@ -55,7 +67,7 @@ func checkBlock(block *Block)bool{
     if len(block.PrevHash)!=64{
         return false
     }
-    if !checkUserID(block.MinerID){
+    if !checkMinerID(block.MinerID){
         return false
     }
     if block.BlockID < 1{
