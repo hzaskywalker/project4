@@ -80,13 +80,18 @@ func checkHashBlock(blockhash string, block *Block)bool{
     return checkBlock(block) && GetHashString(block.MarshalToString()) == blockhash
 }
 
+type MyVerifyResponse struct{
+    t int
+    hash string
+}
+
 type Service struct{
     //To receive other's quest
     GetRequest chan string
     GetResponse chan int
     //TRANSFER //handeled by transfer
     VerifyRequest chan string
-    VerifyResponse chan int
+    VerifyResponse chan *MyVerifyResponse
     //PushTransaction 
     GetHeightRequest chan bool
     GetHeightResponse chan *Block
@@ -107,7 +112,8 @@ func NewService() *Service{
     s.GetRequest = make(chan string)
     s.GetResponse = make(chan int)
     s.VerifyRequest = make(chan string)
-    s.VerifyResponse = make(chan *Block)
+
+    s.VerifyResponse = make(chan *MyVerifyResponse)
 
     s.GetHeightRequest = make(chan bool)
     s.GetHeightResponse = make(chan *Block)
@@ -153,9 +159,15 @@ func (s *Service) Verify(in *pb.Transaction) (*pb.VerifyResponse, error) {
     if !checkTransaction(in){
         return &pb.VerifyResponse{Result: pb.VerifyResponse_FAILED, BlockHash:"?"}, nil
     }
+
     s.VerifyRequest <- in.UUID
     ok := <- s.VerifyResponse
-    return &pb.VerifyResponse{Result: pb.VerifyResponse_FAILED, BlockHash:ok.GetHash()}, nil
+    if ok.t == 3{
+        return &pb.VerifyResponse{Result: pb.VerifyResponse_FAILED, BlockHash:ok.hash}, nil
+    } else if ok.t == 2{
+        return &pb.VerifyResponse{Result: pb.VerifyResponse_PENDING, BlockHash:ok.hash}, nil
+    }
+    return &pb.VerifyResponse{Result: pb.VerifyResponse_SUCCEEDED, BlockHash:ok.hash}, nil
 	//todo SUCCEEDED PENDING
 }
 
