@@ -7,7 +7,7 @@ import (
 )
 
 func WriteJson(hash, Json string){
-    w, e := os.Create(hash + ".json")
+    w, e := os.Create(hash + ".block")
     defer w.Close()
     if e != nil{
         return
@@ -20,7 +20,7 @@ func WriteBlock(block *Block){
 }
 
 func ReadFromDisck(hash string)(*Block, bool){
-    str, e:= ioutil.ReadFile(hash + ".json")
+    str, e:= ioutil.ReadFile(hash + ".block")
     if e!=nil{
         return nil, false
     }

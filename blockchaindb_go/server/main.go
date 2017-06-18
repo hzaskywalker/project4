@@ -64,8 +64,8 @@ func main() {
 
     //TestDatabase()
     //TestMiner()
-    TestMainLoop()
-    return
+    //TestMainLoop()
+    //return
 
     flag.Parse()
     IDstr = fmt.Sprintf("%d",*id)

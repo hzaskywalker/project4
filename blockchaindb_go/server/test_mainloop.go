@@ -10,7 +10,7 @@ import (
 )
 
 func (s *MyServer)GetBlocksByBalance(database *DatabaseEngine, results chan *Block, stop chan int) {
-    //fmt.Println("GetBlocksByBalance")
+    fmt.Println("GetBlocksByBalance")
     for ;;{
         select{
             case <-stop:

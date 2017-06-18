@@ -298,6 +298,7 @@ func (m *Miner) mainLoop(service *Service) error{
         newBlocks = nil
         //fmt.Println(isAdded, is_solved, waitBlocks, service.GetRequest, service.VerifyRequest, service.PushBlockRequest)
         //fmt.Println(service.GetBlockRequest, service.GetHeightRequest)
+        //fmt.Println("====== main loop =======")
 
         select {
             case addedBlock := <- isAdded:
@@ -332,7 +333,7 @@ func (m *Miner) mainLoop(service *Service) error{
                 }
 
             case block := <- waitBlocks:
-                //fmt.Println("In waitBlock")
+                fmt.Println("In waitBlock")
                 //block.MinerID = "xxxx"
                 toSolve = append(toSolve, block)
                 if stop_solve == nil{

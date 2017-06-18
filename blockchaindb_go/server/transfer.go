@@ -121,6 +121,8 @@ func (T *TransferManager) UpdateBlockStatus(block *Block, flag int){
 }
 
 func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result chan *Block, stop chan int){
+    //T.server.GetBlocksByBalance(database, result, stop)
+    //return
 	for ;;{
 		if len(T.dict[2])>0{
 			T.pendingLock.Lock()
