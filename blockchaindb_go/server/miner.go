@@ -185,7 +185,7 @@ func (m *Miner) UpdateBalance(database *DatabaseEngine, block *Block, updateStat
             }
         }else{
             for j:=i+1;j<=len(b)-1;j++{
-                database.UpdateBalance(b[i], -1)
+                database.UpdateBalance(b[j], -1)
             }
             return errors.New("Get error on calculating balance")
         }
