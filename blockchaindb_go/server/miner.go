@@ -260,11 +260,14 @@ func (m *Miner) Init(){
     //for ;!ok;{
 	for i:=0;i<10 && !ok;i++{
         _, newLongest, ok = m.ServerGetHeight()
+        <- time.After(time.Second)
     }
 	if !ok{
 		//newLongest = m.longest
+        fmt.Println("failed to get height")
 		return
 	}
+    fmt.Println("Get Height")
 	
     e := m.InsertBlock(newLongest)//longest would not be calculated
     if e!=nil{

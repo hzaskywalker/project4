@@ -132,7 +132,7 @@ func (b* Block) Solve(stop chan int, solved chan *Block){
                     if res==1 {
                         return
                     }
-                case <-time.After(time.Nanosecond * 100):
+                case <-time.After(time.Nanosecond * 10):
                     {}
             }
         }
