@@ -62,8 +62,8 @@ func (m *Miner) ServerGetBlock(h string)(*Block, bool){
     if !ok{
         return nil, ok
     }
-    /*Json := block.MarshalToString()
-    if GetHashString(Json)!= h{
+    Json := block.MarshalToString()
+    /*if GetHashString(Json)!= h{
         fmt.Println("GetBlock's hash is not correct")
         return nil, false
     }*/
@@ -373,7 +373,7 @@ func (m *Miner) mainLoop(service *Service) error{
                 //m.longest dabase
                 block, ok := m.databaseLongest.GetUUID(UUID)
                 if !ok || block == nil{
-                    VerifyResponse <- 3
+                    service.VerifyResponse <- &MyVerifyResponse{t: 3, hash: "?"}
                 } else{
                     flag := true
                     t := m.longest
@@ -382,12 +382,12 @@ func (m *Miner) mainLoop(service *Service) error{
                             flag = false
                             break
                         }
-                        t, _ := m.Findfather(t)
+                        t, _ = m.Findfather(t)
                     }
-                    if true{
-                        VerifyResponse <- 1
+                    if flag{
+                        service.VerifyResponse <- &MyVerifyResponse{t:1, hash:block.GetHash()}
                     } else{
-                        VerifyResponse <- 2
+                        service.VerifyResponse <- &MyVerifyResponse{t:2, hash:block.GetHash()}
                     }
                 }
             case PushedBlock := <- service.PushBlockRequest:
