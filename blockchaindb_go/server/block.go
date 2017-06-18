@@ -143,6 +143,7 @@ func (b* Block) Solve(stop chan int, solved chan *Block){
             data_list[index+j] = newNonce[j]
         }
         hashVal := GetHashString(string(data_list))
+		//hashVal := fmt.Sprintf("%x", GetHashBytes_(data_list))
         if CheckHash(hashVal){
             b.Nonce = newNonce
             //fmt.Println(b.GetHash())

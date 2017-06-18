@@ -11,6 +11,10 @@ func GetHashBytes(String string) [32]byte {
 	return sha256.Sum256([]byte(String))
 }
 
+func GetHashBytes_(b []byte) [32]byte {
+	return sha256.Sum256(b)
+}
+
 func CheckHash(Hash string) bool {
 	for i:=0; i<HashHardness; i++{
         if Hash[i]!='0'{
