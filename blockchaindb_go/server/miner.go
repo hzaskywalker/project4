@@ -9,7 +9,7 @@ import (
     "time"
     "sync"
     "os"
-    "../hash"
+    //"../hash"
 )
 
 type Miner struct{
@@ -62,7 +62,7 @@ func (m *Miner) ServerGetBlock(h string)(*Block, bool){
         return nil, ok
     }
     Json := block.MarshalToString()
-    if hash.GetHashString(Json)!= h{
+    if GetHashString(Json)!= h{
         fmt.Println("GetBlock's hash is not correct")
         return nil, false
     }

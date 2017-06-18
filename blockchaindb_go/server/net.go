@@ -8,7 +8,7 @@ package main
 import (
     pb "../protobuf/go"
     "strconv"
-    "../hash"
+    //"../hash"
     "errors"
     "golang.org/x/net/context"
     "fmt"
@@ -22,12 +22,12 @@ func checkUserID(UserID string)bool{
     return len(UserID)==8
 }
 
-func checkHash(blockHash string)bool{
+/*func checkHash(blockHash string)bool{  //check first 5 chars?
     if len(blockHash) != 64{
         return false
     }
     return true
-}
+}*/
 
 func checkTransaction(t *pb.Transaction)bool{
     if t.Value <= 0 || t.MiningFee <= 0{
@@ -77,7 +77,7 @@ func checkBlock(block *Block)bool{
 }
 
 func checkHashBlock(blockhash string, block *Block)bool{
-    return checkBlock(block) && hash.GetHashString(block.MarshalToString()) == blockhash
+    return checkBlock(block) && GetHashString(block.MarshalToString()) == blockhash
 }
 
 type Service struct{
@@ -230,6 +230,9 @@ func PushTransaction_client(in *pb.Transaction){
 }
 
 func (s *Service) PushTransaction(in *pb.Transaction) (*pb.Null, error) {
+	if !checkTransaction(in){
+		return &pb.Null{}, nil
+	}
 	ok := s.transfer.AddPending(in)
 	if ok{
 		PushTransaction_client(in)
@@ -261,7 +264,7 @@ func (s *Service) GetHeight(in *pb.Null) (*pb.GetHeightResponse, error) {
 }
 
 func (s *Service) GetBlock(in *pb.GetBlockRequest) (*pb.JsonBlockString, error) {
-    if !checkHash(in.BlockHash){
+    if !CheckHash(in.BlockHash){
         return nil, errors.New("not a hash")
     }
     s.GetBlockRequest <- in.BlockHash
@@ -298,7 +301,9 @@ func (s *RealServer)GetBlock(hash string)(*Block, bool){
 				block := MakeNewBlock()
 				e := block.Unmarshal(res.Json)
 				if e==nil{
-					return block, true
+					if checkHashBlock(hash, block){
+						return block, true
+					}
 				}
 				continue
 				//fmt.Println("receive a strange hash value from someone else")

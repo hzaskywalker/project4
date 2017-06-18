@@ -1,7 +1,7 @@
 package main
 
 import (
-    "../hash"
+    //"../hash"
     pb "../protobuf/go"
     "github.com/golang/protobuf/jsonpb"
     "strings"
@@ -45,18 +45,18 @@ func (b *Block) GetHash()string{
         return b.MyHash
     }
     data:= b.MarshalToString()
-    b.MyHash = hash.GetHashString(data)
+    b.MyHash = GetHashString(data)
     return b.MyHash
 }
 
-func CheckHashBytes(bytes []byte)bool{
+/*func CheckHashBytes(bytes []byte)bool{
     for i:=0; i<HashHardness; i++{
         if bytes[i]!='0'{
             return false
         }
     }
     return true
-    return bytes[0] == '0' && bytes[1] == '0' && bytes[2] == '0' && bytes[3] == '0' && bytes[4] == '0'
+    //return bytes[0] == '0' && bytes[1] == '0' && bytes[2] == '0' && bytes[3] == '0' && bytes[4] == '0'
 } 
 
 func CheckHashString(a string)bool{
@@ -67,13 +67,13 @@ func CheckHashString(a string)bool{
         }
     }
     return true
-    return a[0] == '0' && a[1] == '0' && a[2] == '0' && a[3] == '0' && a[4] == '0' && a[5] == '0'
-} 
+    //return a[0] == '0' && a[1] == '0' && a[2] == '0' && a[3] == '0' && a[4] == '0' && a[5] == '0'
+}*/
 
 
 func (b *Block) CheckHash() bool{
     a := b.GetHash()
-    return CheckHashString(a)
+    return CheckHash(a)
 }
 
 func (b *Block) MarshalToString()string{
@@ -140,8 +140,8 @@ func (b* Block) Solve(stop chan int, solved chan *Block){
         for j:=0;j<8;j++{
             data_list[index+j] = newNonce[j]
         }
-        hashVal := hash.GetHashString(string(data_list))
-        if CheckHashString(hashVal){
+        hashVal := GetHashString(string(data_list))
+        if CheckHash(hashVal){
             b.Nonce = newNonce
             //fmt.Println(b.GetHash())
             b.MyHash = hashVal

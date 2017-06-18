@@ -9,7 +9,7 @@ import (
     "flag"
     
     pb "../protobuf/go"
-    "../hash"
+    //"../hash"
 
     "golang.org/x/net/context"
     "google.golang.org/grpc"
@@ -73,7 +73,7 @@ func main() {
     IDstrInt = int(*id)
 
     minerid:=fmt.Sprintf("Server%02d",*id)
-    _=hash.GetHashString
+    _=GetHashString
     
 
     // Read config
@@ -102,7 +102,7 @@ func main() {
 	for i:=1; i<=int(Dat["nservers"].(float64));i++{
 		ConnStatus[i] = 0
 	}
-	//go CheckServer()
+	go CheckServer()
     // Create gRPC server
 	grpc_s := grpc.NewServer()
 	s := &server{}

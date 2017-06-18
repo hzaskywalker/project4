@@ -4,7 +4,7 @@ import (
     "fmt"
     "time"
     //"math/rand"
-    "../hash"
+    //"../hash"
     "os"
     pb "../protobuf/go"
 )
@@ -43,10 +43,10 @@ func TestMainLoop(){
     }
     prev := miner.longest
 
-    hash1 := hash.GetHashString(prev.MarshalToString())
+    hash1 := GetHashString(prev.MarshalToString())
     tmp := MakeNewBlock()
     tmp.Unmarshal(prev.MarshalToString())
-    hash2 := hash.GetHashString(tmp.MarshalToString())
+    hash2 := GetHashString(tmp.MarshalToString())
     if hash1 != hash2{
         fmt.Println(hash1)
         fmt.Println(hash2)
