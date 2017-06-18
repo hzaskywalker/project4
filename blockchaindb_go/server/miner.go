@@ -93,6 +93,9 @@ func (m *Miner) GetBlock(hash string)(*Block, bool){
 }
 
 func (m *Miner) Findfather(block *Block) (*Block, error){
+	if block.PrevHash == InitHash{
+		return nil, nil
+	}
     fa, ok := m.GetBlock(block.PrevHash)
     if ok == false || (fa!=nil && fa.BlockID+1!=block.BlockID) || fa == nil{
         return nil, errors.New("No father here")
