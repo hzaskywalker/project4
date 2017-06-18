@@ -154,7 +154,7 @@ func (db *DatabaseEngine)UpdateBalance(block *Block, flag int)bool{
 
         if !ok{
             //restore the transaction before
-            for k:=i-flag;;k-=flag{
+            for k:=i-flag;k>=0;k-=flag{
                 db.Transfer(transaction, block, -flag)
                 if k == start{
                     break
