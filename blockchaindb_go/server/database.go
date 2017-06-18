@@ -72,6 +72,7 @@ func (db *DatabaseEngine)Transfer2(from string, to string, value int, value2 int
     }
     db.Add(from, value)
     db.Add(to, -value2)
+    fmt.Println(db.Get(from))
     return false
 }
 
@@ -92,8 +93,9 @@ func (db *DatabaseEngine) GetUUID(UUID string)(*Block, bool){
 func (db *DatabaseEngine)Transfer(t *pb.Transaction, block *Block, flag int)bool{
     UUID := t.UUID
     if flag >0 {
-        _, ok := db.GetUUID(UUID)
-        if ok{
+        b, ok := db.GetUUID(UUID)
+        if ok && b!=nil{
+            //fmt.Println("Invalid UUID")
             return false
         }
     }
@@ -103,7 +105,7 @@ func (db *DatabaseEngine)Transfer(t *pb.Transaction, block *Block, flag int)bool
         if flag>0{
             db.UUID[UUID] = block
         } else{
-            delete(db.UUID, UUID)
+            db.UUID[UUID] = nil
         }
     }
     return ok
@@ -125,11 +127,11 @@ func (db *DatabaseEngine)Get(userId string)(int, bool){
 
 func (db *DatabaseEngine)UpdateBalance(block *Block, flag int)bool{
     //flag is either -1 or 1
+    fmt.Println("UpdataBalance")
     num := len(block.Transactions)
 
     mining_total := 0
     for _, i:=range block.Transactions{
-        //suppose i.MiningFee >= 0
 		if int(i.MiningFee)<0{
 			return false
 		}
@@ -137,7 +139,6 @@ func (db *DatabaseEngine)UpdateBalance(block *Block, flag int)bool{
     }
 
     if flag == -1{
-        //When flag == -1, I don't need to check whether it's correct
         db.Add(block.MinerID, -mining_total)
     }
 
@@ -145,17 +146,12 @@ func (db *DatabaseEngine)UpdateBalance(block *Block, flag int)bool{
     if flag == -1{
         start, end = num-1, -1
     } 
-    //fmt.Println("start-end:", start, end)
+
     for i:=start;i != end;i+=flag{
-        //fmt.Println(i, flag)
-        transaction := block.Transactions[i]
-
-        ok := db.Transfer(transaction, block, flag)
-
+        ok := db.Transfer(block.Transactions[i], block, flag)
         if !ok{
-            //restore the transaction before
-            for k:=i-flag;;k-=flag{
-                db.Transfer(transaction, block, -flag)
+            for k:=i-flag; k>=0 && k<num; k-=flag{
+                db.Transfer(block.Transactions[k], block, -flag)
                 if k == start{
                     break
                 }
