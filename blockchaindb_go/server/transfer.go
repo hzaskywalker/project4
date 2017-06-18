@@ -155,7 +155,7 @@ func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result cha
 					if int(t.Value) > val{
 						continue
 					}
-					database.Transfer(t.FromID, t.ToID, int(t.Value), int(t.Value - t.MiningFee))
+					database.Transfer(t, block, 1)
 					mining_total = mining_total + int(t.MiningFee)
 					block.Transactions = append(block.Transactions, t)
 					if len(block.Transactions) == 50{

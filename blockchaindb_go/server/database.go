@@ -16,6 +16,7 @@ Question:
 
 
 import (
+    pb "../protobuf/go"
     "fmt"
 )
 
@@ -23,6 +24,7 @@ type Balance map[string]int
 
 type DatabaseEngine struct {
     balance Balance
+    UUID map[string]*Block
     initValue int
     fa *DatabaseEngine
     block *Block //maintain the block
@@ -34,7 +36,7 @@ func checkKey(userId string)bool{
 
 func NewDatabaseEngine(fa *DatabaseEngine)*DatabaseEngine{
     //fmt.Println("NewDatabaseEngine")
-    D := &DatabaseEngine{balance: make(Balance), initValue: 1000, fa: fa}
+    D := &DatabaseEngine{balance: make(Balance), initValue: 1000, fa: fa, UUID: make(map[string]*Block)}
     if fa!=nil{
         D.block = D.fa.block
     }
@@ -61,7 +63,7 @@ func (db *DatabaseEngine)Add(userId string, delta int)bool{
     return true
 }
 
-func (db *DatabaseEngine)Transfer(from string, to string, value int, value2 int)bool{
+func (db *DatabaseEngine)Transfer2(from string, to string, value int, value2 int)bool{
     //from pay value
     //to get value2
     ok, ok2 := db.Add(from, -value), db.Add(to, value2)
@@ -71,6 +73,40 @@ func (db *DatabaseEngine)Transfer(from string, to string, value int, value2 int)
     db.Add(from, value)
     db.Add(to, -value2)
     return false
+}
+
+func (db *DatabaseEngine) GetUUID(UUID string)(*Block, bool){
+    b, ok := db.UUID[UUID]
+    if ok{
+        return b, true
+    } else if db.fa!=nil {
+        b, ok := db.fa.UUID[UUID]
+        if ok{
+            db.UUID[UUID] = b
+            return b, true
+        }
+    }
+    return nil, false
+}
+
+func (db *DatabaseEngine)Transfer(t *pb.Transaction, block *Block, flag int)bool{
+    UUID := t.UUID
+    if flag >0 {
+        _, ok := db.GetUUID(UUID)
+        if ok{
+            return false
+        }
+    }
+    value, value2 := int(t.Value), int(t.Value - t.MiningFee)
+    ok := db.Transfer2(t.FromID, t.ToID, value*flag, value2*flag)
+    if ok{
+        if flag>0{
+            db.UUID[UUID] = block
+        } else{
+            delete(db.UUID, UUID)
+        }
+    }
+    return ok
 }
 
 func (db *DatabaseEngine)Get(userId string)(int, bool){
@@ -114,21 +150,12 @@ func (db *DatabaseEngine)UpdateBalance(block *Block, flag int)bool{
         //fmt.Println(i, flag)
         transaction := block.Transactions[i]
 
-        value, value2 := int(transaction.Value), int(transaction.Value - transaction.MiningFee)
-        ok := db.Transfer(transaction.FromID, transaction.ToID, value*flag, value2*flag)
-        
-        /*
-        a, _:= db.Get(transaction.FromID)
-        b, _:= db.Get(transaction.ToID)
-        fmt.Println(transaction.FromID, transaction.ToID, a, b, value, value2)
-        */
+        ok := db.Transfer(transaction, block, flag)
 
         if !ok{
             //restore the transaction before
             for k:=i-flag;;k-=flag{
-                transaction := block.Transactions[k]
-                value, value2 := int(transaction.Value), int(transaction.Value - transaction.MiningFee)
-                db.Transfer(transaction.FromID, transaction.ToID, -value*flag, -value2*flag)
+                db.Transfer(transaction, block, -flag)
                 if k == start{
                     break
                 }
