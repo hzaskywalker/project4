@@ -39,6 +39,9 @@ func checkTransaction(t *pb.Transaction)bool{
     if !checkUserID(t.FromID) || !checkUserID(t.ToID){
         return false
     }
+	if t.FromID == t.ToID{
+		return false
+	}
     //t.FromID == t.ToID
     //T.Value > t.MiningFee
     //t.MiningFee > 0
