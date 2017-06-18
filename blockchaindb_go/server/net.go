@@ -13,7 +13,6 @@ import (
     "golang.org/x/net/context"
     "fmt"
     "google.golang.org/grpc"
-    "google.golang.org/grpc/reflection"
 )
 
 func checkUserID(UserID string)bool{
@@ -175,7 +174,7 @@ func (s *Service) GetBlock(in *pb.GetBlockRequest) (*pb.JsonBlockString, error) 
 func (s *Service) GetHeight(in *pb.Null) (*pb.GetHeightResponse, error) {
     //return &pb.GetHeightResponse{Height: 1, LeafHash: "?"}, nil
 	s.GetHeightRequest <- true
-	block := s.GetHeightResponse
+	block := <- s.GetHeightResponse
 	height := block.BlockID
     return &pb.GetHeightResponse{Height: height, LeafHash: block.GetHash()}, nil
 	
@@ -195,11 +194,10 @@ type Server interface{
 
 type RealServer struct{
     rpc *grpc.Server
-    ctx context.Context
 }
 
 func (s *RealServer)GetBlock(hash string)(*Block, bool){
-    res, e := s.rpc.GetBlock(s.ctx, &pb.GetBlockRequest{BlockHash:hash}) 
+    res, e := s.rpc.GetBlock(context.Background(), &pb.GetBlockRequest{BlockHash:hash}) 
     if e!=nil{
         return nil, false
     } else{
@@ -214,7 +212,7 @@ func (s *RealServer)GetBlock(hash string)(*Block, bool){
 }
 
 func (s *RealServer)GetHeight()(int, *Block, bool){
-    res, e := s.rpc.GetHeight(s.ctx, &pb.Null{})
+    res, e := s.rpc.GetHeight(context.Background(), &pb.Null{})
     if e!=nil {
         return -1, nil, false
     }
@@ -229,7 +227,7 @@ func (s *RealServer)PushBlock(block *Block, success chan bool){
     json := block.MarshalToString()
     hash := block.GetHash()
     go WriteJson(hash, json)
-    s.rpc.PushBlock(s.ctx, &pb.JsonBlockString{Json:json})
+    s.rpc.PushBlock(context.Background(), &pb.JsonBlockString{Json:json})
 }
 
 func (s *RealServer)TRANSFER()*Transaction{

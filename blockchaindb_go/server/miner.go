@@ -21,6 +21,7 @@ type Miner struct{
     server Server
 
     mapLock sync.RWMutex
+    longestLock sync.RWMutex
 
     cached bool
 	MinerID string
@@ -255,15 +256,22 @@ func (m *Miner) AddBlockWithoutCheck(block *Block, finish chan *Block){
 }
 
 func (m *Miner)GetBlocksByBalance(database *DatabaseEngine, result chan *Block, stop chan int){
-    stop_ := make(chan bool)
+    stop_ := make(chan int, 1)
+    res_ := make(chan *Block)
+    worker := func(res_ chan *Block, stop_ chan int){
+        m.transfers.GetBlocksByBalance(database, res_, stop_)
+    }
+    go worker(res_, stop_)
     for ;;{
         select{
             case <- stop:
-                stop_ <- true
+                stop_ <- 1
                 break
-            case res := <- m.transfers.GetBlocksByBalance(database, result, stop_):
+            case res := <- res_:
                 result <- res
-            case time.After(time.Second * 10):
+                stop_ := make(chan int, 1)
+                go worker(res_, stop_)
+            case <- time.After(time.Second * 10):
         }
     }
     <-stop
@@ -295,7 +303,7 @@ func (m *Miner) mainLoop(service *Service) error{
             case addedBlock := <- isAdded:
                 //fmt.Println("getNew")
                 if addedBlock.GetHeight() > m.longest.GetHeight(){
-                    e := m.VerifyBlock(addedBlock)
+                    e := m.VerifyBlock(addedBlock) //It's better to build a verify list
                     //place where we change the consensus
                     if e == nil{
                         if true{

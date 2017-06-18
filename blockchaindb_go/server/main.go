@@ -94,7 +94,7 @@ func main() {
 
     // Create gRPC server
 	grpc_s := grpc.NewServer()
-	q := RealServer{ctx:context.Background(), rpc:grpc_s}
+	q := RealServer{rpc:grpc_s}
 	miner := NewMiner(&q)
 
     s := &server{}

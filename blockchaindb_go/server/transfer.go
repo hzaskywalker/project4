@@ -99,15 +99,11 @@ func (T *TransferManager) UpdateBlockStatus(block *Block, flag int){
 func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result chan *Block, stop chan int){
 	for ;;{
 		if len(T.dict[2])>0{
-			//T.lock[2].Lock()
-			//T.lock[1].Lock()
 			for _, t := range T.dict[2]{
 				t.flag = 1
 				T.dict[1][t.trans.UUID] = t
 			}
 			T.dict[2] = make(TransHouse)
-			//T.lock[1].UnLock()
-			//T.lock[2].UnLock()
 		}
 		block := MakeNewBlock()
 		mining_total := 0
@@ -132,8 +128,7 @@ func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result cha
 		}
 		if len(block.Transactions)>0{
 			database.Add(block.MinerID, mining_total)
-            <-stop
-			return block
+            result <- block
 		}
 	}
 }
