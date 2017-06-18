@@ -178,7 +178,7 @@ func (m *Miner) UpdateBalance(database *DatabaseEngine, block *Block, updateStat
 }
 
 func (m *Miner) UpdateLongest(block *Block)error{
-    if m.longest.GetHeight() < block.GetHeight() {
+    if m.longest.GetHeight() < block.GetHeight() || m.longest.GetHeight() == block.GetHeight() && block.GetHash() < m.longest.GetHash(){
         e := m.UpdateBalance(m.databaseLongest, block, true)
         if e!=nil{
             fmt.Println(e)
@@ -334,6 +334,7 @@ func (m *Miner) mainLoop(service *Service) error{
                         fmt.Println("Update longest", addedBlock.GetHeight())
                         m.UpdateLongest(addedBlock)
 						stopSelectTrans = make(chan int, 1)  //should be 1
+						database := NewDatabaseEngine(m.databaseLongest)
                         go m.transfers.GetBlocksByBalance(database, waitBlocks, stopSelectTrans)
                     }
                 }
