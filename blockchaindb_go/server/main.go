@@ -35,23 +35,26 @@ func (s *server) Verify(ctx context.Context, in *pb.Transaction) (*pb.VerifyResp
     //return &pb.VerifyResponse{Result: pb.VerifyResponse_FAILED, BlockHash:"?"}, nil
 	return s.s.Verify(in)
 }
+func (s *server) PushTransaction(ctx context.Context, in *pb.Transaction) (*pb.Null, error) {
+    //return &pb.Null{}, nil
+	return s.s.PushTransaction(in)
+}
+func (s *server) PushBlock(ctx context.Context, in *pb.JsonBlockString) (*pb.Null, error) {
+    //return &pb.Null{}, nil
+	return s.s.PushBlock(in)
+}
 func (s *server) GetHeight(ctx context.Context, in *pb.Null) (*pb.GetHeightResponse, error) {
     return s.s.GetHeight(in)
 }
 func (s *server) GetBlock(ctx context.Context, in *pb.GetBlockRequest) (*pb.JsonBlockString, error) {
     return s.s.GetBlock(in)
 }
-func (s *server) PushBlock(ctx context.Context, in *pb.JsonBlockString) (*pb.Null, error) {
-    //return &pb.Null{}, nil
-	return s.s.PushBlock(in)
-}
-func (s *server) PushTransaction(ctx context.Context, in *pb.Transaction) (*pb.Null, error) {
-    //return s.s.PushTransaction(in)
-    return &pb.Null{}, nil
-}
+
+
 
 var id=flag.Int("id",1,"Server's ID, 1<=ID<=NServers")
-
+var Dat map[string]interface{}
+var IDstr string
 // Main function, RPC server initialization
 func main() {
     //set the hardness
@@ -64,26 +67,24 @@ func main() {
     return
 
     flag.Parse()
-    IDstr:=fmt.Sprintf("%d",*id)
+    IDstr = fmt.Sprintf("%d",*id)
 
     _=fmt.Sprintf("Server%02d",*id)
     _=hash.GetHashString
     
 
     // Read config
-    address, _ := func() (string, string) {
-        conf, err := ioutil.ReadFile("config.json")
-        if err != nil {
-            panic(err)
-        }
-        var dat map[string]interface{}
-        err = json.Unmarshal(conf, &dat)
-        if err != nil {
-            panic(err)
-        }
-        dat = dat[IDstr].(map[string]interface{}) // should be dat[myNum] in the future
-        return fmt.Sprintf("%s:%s", dat["ip"], dat["port"]), fmt.Sprintf("%s",dat["dataDir"])
-    }()
+	conf, err := ioutil.ReadFile("config.json")
+	if err != nil {
+		panic(err)
+	}
+	err = json.Unmarshal(conf, &Dat)
+	if err != nil {
+		panic(err)
+	}
+	dat := Dat[IDstr].(map[string]interface{}) // should be dat[myNum] in the future
+	address, _ := fmt.Sprintf("%s:%s", dat["ip"], dat["port"]), fmt.Sprintf("%s",dat["dataDir"])
+	
 
     // Bind to port
     lis, err := net.Listen("tcp", address)
@@ -110,3 +111,6 @@ func main() {
         log.Fatalf("failed to serve: %v", err)
     }
 }
+
+
+

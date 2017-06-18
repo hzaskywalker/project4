@@ -44,7 +44,7 @@ type TransferManager struct{
     server TransferServer
 
     dict [3]TransHouse
-    lock [3]sync.RWMutex
+    lock, pendingLock sync.RWMutex
 
     //need something to maintain all transaction with flag = 1
     //use map to implement set
@@ -72,45 +72,79 @@ func NewTransferManager(_server TransferServer)*TransferManager{
     return T
 }
 
-func (T *TransferManager)SetFlag(t *Transaction, flag int){
+func (T *TransferManager)SetFlag(t *Transaction, flag int){  //flag=0 or 1
     //set the flag into Pending
 	if flag == t.flag{
 		return
 	}
-	//T.lock[t.flag].Lock()
+	T.lock.Lock()
 	delete(T.dict[t.flag], t.trans.UUID)
 	//T.lock[t.flag].UnLock()
 	t.flag = flag
 	//T.lock[t.flag].Lock()
 	T.dict[t.flag][t.trans.UUID] = t
-	//T.lock[t.flag].UnLock()
+	T.lock.UnLock()
 }
 
-func (T *TransferManager)AddPending(t_ *pb.Transaction){
-	t := Transaction{flag: 2, trans: t_}
-	T.lock[2].Lock()
+func (T *TransferManager)AddPending(t_ *pb.Transaction)bool{
+	t := &Transaction{flag: 2, trans: t_}
+	T.lock.RLock()
+	tmp, ok1 := T.dict[0][t.trans.UUID]
+	tmp, ok2 := T.dict[1][t.trans.UUID]
+	T.lock.UnRLock()
+	
+	if ok1 || ok2{
+		return false
+	}
+	
+	T.pendingLock.Lock()
 	T.dict[2][t.trans.UUID] = t
-	T.lock[2].UnLock()
+	T.pendingLock.UnLock()
+	return true
 }
 
 func (T *TransferManager) UpdateBlockStatus(block *Block, flag int){
+	T.lock.Lock()
+	for _, t_ :=range block.Transactions{
+		if flag==0{
+			t := &Transaction{flag: 0, trans: t_}
+			delete(T.dict[1], t.trans.UUID)
+			T.dict[t.flag][t.trans.UUID] = t
+		}
+		if flag==1{
+			t := &Transaction{flag: 1, trans: t_}
+			delete(T.dict[0], t.trans.UUID)
+			T.dict[t.flag][t.trans.UUID] = t
+		}
+    }
+	T.lock.UnLock()
 }
 
 func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result chan *Block, stop chan int){
 	for ;;{
 		if len(T.dict[2])>0{
+			T.pendingLock.Lock()
+			T.lock.Lock()
 			for _, t := range T.dict[2]{
+				/*tmp, ok := T.dict[0][t.trans.UUID]
+				if ok{
+					continue
+				}*/
 				t.flag = 1
 				T.dict[1][t.trans.UUID] = t
 			}
 			T.dict[2] = make(TransHouse)
+			T.lock.UnLock()
+			T.pendingLock.UnLock()
 		}
 		block := MakeNewBlock()
 		mining_total := 0
+		T.lock.RLock()
 		for _, t_ := range T.dict[1]{
 			select {
 				case signal := <- stop:
 					if signal == 1{
+						T.lock.UnRLock()
 						return
 					}
 				default:
@@ -126,6 +160,7 @@ func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result cha
 					}
 			}
 		}
+		T.lock.UnRLock()
 		if len(block.Transactions)>0{
 			database.Add(block.MinerID, mining_total)
             result <- block
