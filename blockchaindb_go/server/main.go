@@ -24,6 +24,7 @@ type server struct{
 
 // Database Interface 
 func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetResponse, error) {
+	fmt.Println("called Get")
     //return &pb.GetResponse{Value: 1000}, nil
 	return s.s.Get(in)
 }
@@ -95,10 +96,10 @@ func main() {
     }
     log.Printf("Listening: %s ...", address)
 
-	Conn = make([]*grpc.ClientConn, Dat["nservers"].(int) + 1)
-	ConnClient = make([]pb.BlockChainMinerClient, Dat["nservers"].(int) + 1)
-	ConnStatus = make([]int, Dat["nservers"].(int) + 1)
-	for i:=1; i<=Dat["nservers"].(int);i++{
+	Conn = make([]*grpc.ClientConn, int(Dat["nservers"].(float64)) + 1)
+	ConnClient = make([]pb.BlockChainMinerClient, int(Dat["nservers"].(float64)) + 1)
+	ConnStatus = make([]int, int(Dat["nservers"].(float64)) + 1)
+	for i:=1; i<=int(Dat["nservers"].(float64));i++{
 		ConnStatus[i] = 0
 	}
 	go CheckServer()

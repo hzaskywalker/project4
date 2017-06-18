@@ -159,7 +159,8 @@ var connLock sync.RWMutex
 func CheckServer(){
 	//check server
 	for ;;{
-		for i:=1; i<=Dat["nservers"].(int); i++{
+		//fmt.Println("Checking Server")
+		for i:=1; i<=int(Dat["nservers"].(float64)); i++{
 			if i==IDstrInt{
 				continue
 			}
@@ -183,13 +184,15 @@ func CheckServer(){
 			}
 			connLock.Unlock()
 		}
+		//time.Sleep(2 * time.Second)
+		//fmt.Println("Checking Server Sleep")
 		time.Sleep(10 * time.Second)
 	}
 }
 
 /*func PushTransaction_client(in *pb.Transaction){
 	//client
-	for i:=1; i<=int(Dat["nservers"].(int)); i++{
+	for i:=1; i<=int(int(Dat["nservers"].(float64))); i++{
 		if i==IDstrInt{
 			continue
 		}
@@ -207,7 +210,7 @@ func CheckServer(){
 }*/
 
 func PushTransaction_client(in *pb.Transaction){
-	for i:=1; i<=Dat["nservers"].(int); i++{
+	for i:=1; i<=int(Dat["nservers"].(float64)); i++{
 		connLock.RLock()
 		s := ConnStatus[i]
 		c := ConnClient[i]
@@ -277,7 +280,7 @@ type RealServer struct{
 }
 
 func (s *RealServer)GetBlock(hash string)(*Block, bool){
-	for i:=1; i<=Dat["nservers"].(int); i++{
+	for i:=1; i<=int(Dat["nservers"].(float64)); i++{
 		connLock.RLock()
 		status := ConnStatus[i]
 		c := ConnClient[i]
@@ -300,7 +303,7 @@ func (s *RealServer)GetBlock(hash string)(*Block, bool){
 }
 
 func (s *RealServer)GetHeight()(int, *Block, bool){
-	for i:=1; i<=Dat["nservers"].(int); i++{
+	for i:=1; i<=int(Dat["nservers"].(float64)); i++{
 		connLock.RLock()
 		status := ConnStatus[i]
 		c := ConnClient[i]
@@ -324,7 +327,7 @@ func (s *RealServer)PushBlock(block *Block, success chan bool){
     hash := block.GetHash()
     go WriteJson(hash, json)
 	for ;;{
-		for i:=1; i<=Dat["nservers"].(int); i++{
+		for i:=1; i<=int(Dat["nservers"].(float64)); i++{
 			connLock.RLock()
 			status := ConnStatus[i]
 			c := ConnClient[i]
