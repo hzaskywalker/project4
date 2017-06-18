@@ -82,6 +82,7 @@ func (m *Miner) GetBlock(hash string)(*Block, bool){
     if ok && block!=nil{
         return block, ok
     }else if ok && block==nil{
+		fmt.Println("-------error--------")
         return nil, false
     }
 	fmt.Println("func GetBlock ask server", hash)
@@ -103,6 +104,7 @@ func (m *Miner) Findfather(block *Block) (*Block, error){
 	}
     fa, ok := m.GetBlock(block.PrevHash)
     if ok == false || (fa!=nil && fa.BlockID+1!=block.BlockID) || fa == nil{
+		fmt.Println("-------find father error--------")
         return nil, errors.New("No father here")
     }
     return fa, nil
@@ -215,11 +217,13 @@ func (m *Miner) VerifyBlock(block *Block)error{
     if e == nil{
         return nil
     } else{
-		fmt.Println("verify func start", block.BlockID)
+		//fmt.Println("verify func start", block.BlockID)
         m.mapLock.Lock()
-        m.hash2block[block.GetHash()] = nil
+        //m.hash2block[block.GetHash()] = nil
+		erase(m.hash2block, block.GetHash())
         m.mapLock.Unlock()
-		fmt.Println("end verify func")
+		//fmt.Println("end verify func")
+		fmt.Println("------error------")
         return errors.New("block balance wrong")
     }
 }
