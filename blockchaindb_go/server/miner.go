@@ -149,22 +149,13 @@ func (m *Miner) UpdateBalance(database *DatabaseEngine, block *Block, updateStat
         return nil
     }
     lca, e := m.LCA(A, block)
-	for A_:=A;A_!=lca; {
-		fmt.Println("A_ LCA", A_.GetHash())
-		A_, e = m.Findfather(A_)
-	}
-	for B_:=block;B_!=lca; {
-		fmt.Println("B_ LCA", B_.GetHash())
-		B_, e = m.Findfather(B_)
-	}
-	fmt.Println("LCA", lca.GetHash())
 	
     if e!=nil{
         return e
     }
 
     for ;A!=lca; {
-		fmt.Println("A LCA", A.GetHash())
+		//fmt.Println("A LCA", A.GetHash())
         database.UpdateBalance(A, -1)
         if updateStatus{
             m.transfers.UpdateBlockStatus(A, 1)//should all be pendding
@@ -174,7 +165,7 @@ func (m *Miner) UpdateBalance(database *DatabaseEngine, block *Block, updateStat
 
     var b []*Block
     for B:=block;B!=lca; {
-		fmt.Println("B LCA", B.GetHash())
+		//fmt.Println("B LCA", B.GetHash())
         b = append(b, B)
         B, e = m.Findfather(B)
     }
@@ -218,10 +209,10 @@ func (m *Miner) VerifyBlock(block *Block)error{
         return nil
     } else{
 		//fmt.Println("verify func start", block.BlockID)
-        m.mapLock.Lock()
+        //m.mapLock.Lock()
         //m.hash2block[block.GetHash()] = nil
-		erase(m.hash2block, block.GetHash())
-        m.mapLock.Unlock()
+		//erase(m.hash2block, block.GetHash())
+        //m.mapLock.Unlock()
 		//fmt.Println("end verify func")
 		fmt.Println("------error------")
         return errors.New("block balance wrong")
@@ -284,9 +275,11 @@ func (m *Miner) Init(){
 }
 
 func (m *Miner) AddBlockWithoutCheck(block *Block, finish chan *Block){
-    m.InsertBlock(block)
-    fmt.Println("finish")
-    finish <- block
+    e := m.InsertBlock(block)
+    if e == nil {
+        fmt.Println("finish")
+        finish <- block
+    }
 }
 
 func (m *Miner)GetBlocksByBalance(database *DatabaseEngine, result chan *Block, stop chan int){
@@ -357,7 +350,7 @@ func (m *Miner) mainLoop(service *Service) error{
                         //}
 
                         //we need stop other verifier, otherwise their databse would be wrong
-                        fmt.Println("Update longest", addedBlock.GetHeight())
+                        fmt.Println("Update longest", addedBlock.GetHeight(), addedBlock.MinerID)
                         m.UpdateLongest(addedBlock)
 						stopSelectTrans = make(chan int, 1)  //should be 1
 						database := NewDatabaseEngine(m.databaseLongest)
@@ -372,6 +365,18 @@ func (m *Miner) mainLoop(service *Service) error{
 				stop_solve = nil
 				go WriteBlock(newBlocks, m.dataPath)
 				go m.server.PushBlock(newBlocks)
+
+                m.InsertBlock(newBlocks)
+                fmt.Println(m.longest.BlockID, solved.BlockID, solved.PrevHash==m.longest.GetHash())
+                if m.VerifyBlock(m.longest)!=nil{
+                    fmt.Println("errors2")
+                    os.Exit(0)
+                }
+                if m.VerifyBlock(newBlocks)!=nil{
+                    fmt.Println("errors3")
+                    os.Exit(0)
+                }
+                //newBlocks = nil
                 //stop_solve <- 1
                 //stop_solve = nil
                 /*if len(toSolve) > 0{

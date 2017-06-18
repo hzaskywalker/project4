@@ -140,6 +140,7 @@ func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result cha
 			T.pendingLock.Unlock()
 		}
 		block := MakeNewBlock()
+        block.BlockID = -1
 		mining_total := 0
 		T.lock.RLock()
 		for _, t_ := range T.dict[1]{
@@ -155,6 +156,10 @@ func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result cha
 					if int(t.Value) > val{
 						continue
 					}
+                    b, ok := database.GetUUID(t.UUID)
+                    if ok && b!=nil{
+                        continue
+                    }
 					database.Transfer(t, block, 1)
 					mining_total = mining_total + int(t.MiningFee)
 					block.Transactions = append(block.Transactions, t)
