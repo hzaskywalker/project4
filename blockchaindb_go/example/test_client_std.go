@@ -40,7 +40,7 @@ var (
 	UserID = flag.String("user", "00000000", "User account ID for the operation.")
 	FromID = flag.String("from", "00000000", "From account (for Transfer)")
 	ToID   = flag.String("to", "12345678", "To account (for Transfer)")
-	Value  = flag.Int("value", 3, "Amount of transaction")
+	Value  = flag.Int("value", 1, "Amount of transaction")
 	Fee  = flag.Int("fee", 1, "Mining Fee of transaction")
 )
 

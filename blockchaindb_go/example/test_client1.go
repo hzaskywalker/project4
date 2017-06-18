@@ -25,7 +25,7 @@ var address = func() string {
 	if err != nil {
 		panic(err)
 	}
-	dat = dat["1"].(map[string]interface{})
+	dat = dat["2"].(map[string]interface{})
 	return fmt.Sprintf("%s:%s", dat["ip"], dat["port"])
 }()
 
