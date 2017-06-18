@@ -13,9 +13,7 @@ import (
     "golang.org/x/net/context"
     "fmt"
     "google.golang.org/grpc"
-    "google.golang.org/grpc/reflection"
 	"log"
-	"os"
 )
 
 func checkUserID(UserID string)bool{
@@ -154,11 +152,11 @@ func (s *Service) Verify(in *pb.Transaction) (*pb.VerifyResponse, error) {
 
 func PushTransaction_client(in *pb.Transaction){
 	//client
-	for i:=1; i<=int(Dat["nservers"]); i++{
-		if i==int(IDstr){
+	for i:=1; i<=int(Dat["nservers"].(int)); i++{
+		if i==IDstrInt{
 			continue
 		}
-		dat := Dat[i].(map[string]interface{})
+		dat := Dat[strconv.Itoa(i)].(map[string]interface{})
 		address, _ := fmt.Sprintf("%s:%s", dat["ip"], dat["port"]), fmt.Sprintf("%s",dat["dataDir"])
 		conn, err := grpc.Dial(address, grpc.WithInsecure())
 		if err != nil {
@@ -166,12 +164,9 @@ func PushTransaction_client(in *pb.Transaction){
 		}
 		c := pb.NewBlockChainMinerClient(conn)
 		r, err := c.PushTransaction(context.Background(), in)
-		if err!=nil{
-			success<-true
-		}
 		conn.Close()
 	}
-	return &pb.Null{}, nil
+    return
 }
 
 func (s *Service) PushTransaction(in *pb.Transaction) (*pb.Null, error) {
@@ -199,7 +194,7 @@ func (s *Service) PushBlock(in *pb.JsonBlockString) (*pb.Null, error) {
 func (s *Service) GetHeight(in *pb.Null) (*pb.GetHeightResponse, error) {
     //return &pb.GetHeightResponse{Height: 1, LeafHash: "?"}, nil
 	s.GetHeightRequest <- true
-	block := s.GetHeightResponse
+	block := <- s.GetHeightResponse
 	height := block.BlockID
     return &pb.GetHeightResponse{Height: height, LeafHash: block.GetHash()}, nil
 	
@@ -216,19 +211,6 @@ func (s *Service) GetBlock(in *pb.GetBlockRequest) (*pb.JsonBlockString, error) 
     } else{
         return &pb.JsonBlockString{Json:block.MarshalToString()}, nil
     }
-}
-
-func (s *Service) GetHeight(in *pb.Null) (*pb.GetHeightResponse, error) {
-    //return &pb.GetHeightResponse{Height: 1, LeafHash: "?"}, nil
-	s.GetHeightRequest <- true
-	block := <- s.GetHeightResponse
-	height := block.BlockID
-    return &pb.GetHeightResponse{Height: height, LeafHash: block.GetHash()}, nil
-	
-}
-
-func (s *Service) Transfer(in *pb.Transaction) (*pb.BooleanResponse, error) {
-	s.transfer.AddPending(in)
 }
 
 type Server interface{
@@ -278,10 +260,10 @@ func (s *RealServer)PushBlock(block *Block, success chan bool){
     //s.rpc.PushBlock(s.ctx, &pb.JsonBlockString{Json:json})
 	//client
 	for i:=1; i<=int(Dat["nservers"]); i++{
-		if i==int(IDstr){
+		if i==strconv.Atoi(IDstr){
 			continue
 		}
-		dat := Dat[i].(map[string]interface{})
+		dat := Dat[strconv.Itoa(i)].(map[string]interface{})
 		address, _ := fmt.Sprintf("%s:%s", dat["ip"], dat["port"]), fmt.Sprintf("%s",dat["dataDir"])
 		conn, err := grpc.Dial(address, grpc.WithInsecure())
 		if err != nil {

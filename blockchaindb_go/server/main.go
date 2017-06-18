@@ -55,6 +55,7 @@ func (s *server) GetBlock(ctx context.Context, in *pb.GetBlockRequest) (*pb.Json
 var id=flag.Int("id",1,"Server's ID, 1<=ID<=NServers")
 var Dat map[string]interface{}
 var IDstr string
+var IDstrInt int
 // Main function, RPC server initialization
 func main() {
     //set the hardness
@@ -68,6 +69,7 @@ func main() {
 
     flag.Parse()
     IDstr = fmt.Sprintf("%d",*id)
+    IDstrInt = *id
 
     _=fmt.Sprintf("Server%02d",*id)
     _=hash.GetHashString
