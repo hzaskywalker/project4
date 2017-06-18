@@ -331,7 +331,10 @@ func (m *Miner) mainLoop(service *Service) error{
         newBlocks = nil
         //fmt.Println(isAdded, is_solved, waitBlocks, service.GetRequest, service.VerifyRequest, service.PushBlockRequest)
         //fmt.Println(service.GetBlockRequest, service.GetHeightRequest)
-        fmt.Println("====== main loop =======")
+        //fmt.Println("====== main loop =======")
+        a, _ :=m.databaseLongest.Get(m.MinerID)
+        b, _ := m.databaseLongest.Get("Server02")
+        fmt.Println(m.MinerID, a, b)
 
         select {
             case addedBlock := <- isAdded:
@@ -339,7 +342,7 @@ func (m *Miner) mainLoop(service *Service) error{
 				//fmt.Println(addedBlock.GetHeight(), m.longest.GetHeight())
                 if addedBlock.GetHeight() > m.longest.GetHeight() || addedBlock.GetHeight() == m.longest.GetHeight() && addedBlock.GetHash() < m.longest.GetHash(){
 					//fmt.Println("start verify")
-					fmt.Println(addedBlock.GetHash(), m.longest.GetHash())
+					//fmt.Println(addedBlock.GetHash(), m.longest.GetHash())
                     e := m.VerifyBlock(addedBlock) //It's better to build a verify list
 					//fmt.Println("end verify", e)
                     //place where we change the consensus
@@ -367,7 +370,7 @@ func (m *Miner) mainLoop(service *Service) error{
 				//fmt.Println("end getNew")
             case solved := <- is_solved:
 				//fmt.Println("enter solved")
-                //fmt.Println("In Solved")
+                fmt.Println("Solved")
                 newBlocks = solved
 				stop_solve = nil
 				go WriteBlock(newBlocks, m.dataPath)
