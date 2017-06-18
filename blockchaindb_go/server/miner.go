@@ -224,7 +224,9 @@ func (m *Miner) VerifyBlock(block *Block)error{
         m.mapLock.Unlock()
 		//fmt.Println("end verify func")
 		fmt.Println("------error------")
-		//os.Exit(1)
+		fmt.Println(m.databaseLongest.UUID)
+		fmt.Println(database.UUID)
+		os.Exit(1)
         return errors.New("block balance wrong")
     }
 }
