@@ -52,14 +52,14 @@ type TransferManager struct{
     //channel chan *Transaction
 }
 
-/*func (T *TransferManager)GetDictSize()int{
-    return len(T.dict)
+func (T *TransferManager)GetDictSize()int{
+    return len(T.dict[0])  //only for test, need lock
 }
 
 func (T *TransferManager)GetPendingSize()int{
     //unsafe, only for debug
-    return len(T.Pending)
-}*/
+    return len(T.dict[2])  //only for test, need lock
+}
 
 func NewTransferManager(_server TransferServer)*TransferManager{
     T := &TransferManager{server: _server}
@@ -79,19 +79,19 @@ func (T *TransferManager)SetFlag(t *Transaction, flag int){  //flag=0 or 1
 	}
 	T.lock.Lock()
 	delete(T.dict[t.flag], t.trans.UUID)
-	//T.lock[t.flag].UnLock()
+	//T.lock[t.flag].Unlock()
 	t.flag = flag
 	//T.lock[t.flag].Lock()
 	T.dict[t.flag][t.trans.UUID] = t
-	T.lock.UnLock()
+	T.lock.Unlock()
 }
 
 func (T *TransferManager)AddPending(t_ *pb.Transaction)bool{
 	t := &Transaction{flag: 2, trans: t_}
 	T.lock.RLock()
-	tmp, ok1 := T.dict[0][t.trans.UUID]
-	tmp, ok2 := T.dict[1][t.trans.UUID]
-	T.lock.UnRLock()
+	_, ok1 := T.dict[0][t.trans.UUID]
+	_, ok2 := T.dict[1][t.trans.UUID]
+	T.lock.RUnlock()
 	
 	if ok1 || ok2{
 		return false
@@ -99,7 +99,7 @@ func (T *TransferManager)AddPending(t_ *pb.Transaction)bool{
 	
 	T.pendingLock.Lock()
 	T.dict[2][t.trans.UUID] = t
-	T.pendingLock.UnLock()
+	T.pendingLock.Unlock()
 	return true
 }
 
@@ -117,7 +117,7 @@ func (T *TransferManager) UpdateBlockStatus(block *Block, flag int){
 			T.dict[t.flag][t.trans.UUID] = t
 		}
     }
-	T.lock.UnLock()
+	T.lock.Unlock()
 }
 
 func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result chan *Block, stop chan int){
@@ -134,8 +134,8 @@ func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result cha
 				T.dict[1][t.trans.UUID] = t
 			}
 			T.dict[2] = make(TransHouse)
-			T.lock.UnLock()
-			T.pendingLock.UnLock()
+			T.lock.Unlock()
+			T.pendingLock.Unlock()
 		}
 		block := MakeNewBlock()
 		mining_total := 0
@@ -144,12 +144,13 @@ func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result cha
 			select {
 				case signal := <- stop:
 					if signal == 1{
-						T.lock.UnRLock()
+						T.lock.RUnlock()
 						return
 					}
 				default:
 					t := t_.trans
-					if t.Value > database.Get(t.FromID){
+					val, _ := database.Get(t.FromID)
+					if int(t.Value) > val{
 						continue
 					}
 					database.Transfer(t.FromID, t.ToID, int(t.Value), int(t.Value - t.MiningFee))
@@ -160,7 +161,7 @@ func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result cha
 					}
 			}
 		}
-		T.lock.UnRLock()
+		T.lock.RUnlock()
 		if len(block.Transactions)>0{
 			database.Add(block.MinerID, mining_total)
             result <- block

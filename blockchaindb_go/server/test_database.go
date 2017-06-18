@@ -230,6 +230,10 @@ func (s *MyServer)GetHeight()(int, *Block, bool){
     return int(s.longest.BlockID), s.longest, true
 }
 
+func (s *MyServer)PushBlock(block *Block, success chan bool){
+	//empty?
+}
+
 func TestDatabaseEngine(s *MyServer){
     D := NewDatabaseEngine(nil)
 

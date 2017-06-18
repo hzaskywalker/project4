@@ -69,7 +69,7 @@ func main() {
 
     flag.Parse()
     IDstr = fmt.Sprintf("%d",*id)
-    IDstrInt = *id
+    IDstrInt = int(*id)
 
     _=fmt.Sprintf("Server%02d",*id)
     _=hash.GetHashString
@@ -95,13 +95,19 @@ func main() {
     }
     log.Printf("Listening: %s ...", address)
 
+	Conn = make([]*grpc.ClientConn, Dat["nservers"].(int) + 1)
+	ConnClient = make([]pb.BlockChainMinerClient, Dat["nservers"].(int) + 1)
+	ConnStatus = make([]int, Dat["nservers"].(int) + 1)
+	for i:=1; i<=Dat["nservers"].(int);i++{
+		ConnStatus[i] = 0
+	}
+	go CheckServer()
     // Create gRPC server
 	grpc_s := grpc.NewServer()
-	q := RealServer{rpc:grpc_s}
-	miner := NewMiner(&q)
-
-    s := &server{}
+	s := &server{}
 	s.s = NewService()
+	q := RealServer{}  //rpc:s
+	miner := NewMiner(&q)
 	s.s.transfer = miner.transfers
     pb.RegisterBlockChainMinerServer(grpc_s, s)
     // Register reflection service on gRPC server.

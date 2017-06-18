@@ -33,7 +33,7 @@ func GenTransaction(A string, B string, value int, MiningFee int, UUID string)*T
     t.trans.MiningFee = int32(MiningFee)
     t.trans.Type = pb.Transaction_Types(5)
     t.trans.UUID = UUID
-    t.UUID = t.trans.UUID
+    t.trans.UUID = t.trans.UUID
     return t
 }
 

@@ -13,7 +13,9 @@ import (
     "golang.org/x/net/context"
     "fmt"
     "google.golang.org/grpc"
-	"log"
+	//"log"
+	"sync"
+	"time"
 )
 
 func checkUserID(UserID string)bool{
@@ -150,7 +152,42 @@ func (s *Service) Verify(in *pb.Transaction) (*pb.VerifyResponse, error) {
 	//todo SUCCEEDED PENDING
 }
 
-func PushTransaction_client(in *pb.Transaction){
+var Conn []*grpc.ClientConn
+var ConnClient []pb.BlockChainMinerClient
+var ConnStatus []int
+var connLock sync.RWMutex
+func CheckServer(){
+	//check server
+	for ;;{
+		for i:=1; i<=Dat["nservers"].(int); i++{
+			if i==IDstrInt{
+				continue
+			}
+			connLock.RLock()
+			if ConnStatus[i]==1{
+				Conn[i].Close()
+			}
+			connLock.RUnlock()
+			dat := Dat[strconv.Itoa(i)].(map[string]interface{})
+			address, _ := fmt.Sprintf("%s:%s", dat["ip"], dat["port"]), fmt.Sprintf("%s",dat["dataDir"])
+			conn, err := grpc.Dial(address, grpc.WithInsecure())
+			connLock.Lock()
+			if err != nil {
+				//log.Fatalf("Cannot connect to server: %v", err)
+				ConnStatus[i] = 0
+				Conn[i] = conn
+			} else {
+				ConnStatus[i] = 1
+				Conn[i] = conn
+				ConnClient[i] = pb.NewBlockChainMinerClient(Conn[i])
+			}
+			connLock.Unlock()
+		}
+		time.Sleep(10 * time.Second)
+	}
+}
+
+/*func PushTransaction_client(in *pb.Transaction){
 	//client
 	for i:=1; i<=int(Dat["nservers"].(int)); i++{
 		if i==IDstrInt{
@@ -167,6 +204,19 @@ func PushTransaction_client(in *pb.Transaction){
 		conn.Close()
 	}
     return
+}*/
+
+func PushTransaction_client(in *pb.Transaction){
+	for i:=1; i<=Dat["nservers"].(int); i++{
+		connLock.RLock()
+		s := ConnStatus[i]
+		c := ConnClient[i]
+		connLock.RUnlock()
+		if s==1{
+			c.PushTransaction(context.Background(), in)
+		}
+	}
+	return
 }
 
 func (s *Service) PushTransaction(in *pb.Transaction) (*pb.Null, error) {
@@ -223,58 +273,69 @@ type Server interface{
 }
 
 type RealServer struct{
-    rpc *grpc.Server
+    //rpc *grpc.Server
 }
 
 func (s *RealServer)GetBlock(hash string)(*Block, bool){
-    res, e := s.rpc.GetBlock(context.Background(), &pb.GetBlockRequest{BlockHash:hash}) 
-    if e!=nil{
-        return nil, false
-    } else{
-        block := MakeNewBlock()
-        e := block.Unmarshal(res.Json)
-        if e==nil{
-            return block, true
-        }
-        fmt.Println("receive a strange hash value from someone else")
-        return nil, false
-    }
+	for i:=1; i<=Dat["nservers"].(int); i++{
+		connLock.RLock()
+		status := ConnStatus[i]
+		c := ConnClient[i]
+		connLock.RUnlock()
+		if status==1{
+			res, e := c.GetBlock(context.Background(), &pb.GetBlockRequest{BlockHash:hash}) 
+			if e==nil{
+				block := MakeNewBlock()
+				e := block.Unmarshal(res.Json)
+				if e==nil{
+					return block, true
+				}
+				continue
+				//fmt.Println("receive a strange hash value from someone else")
+				//return nil, false
+			}
+		}
+	}
+	return nil, false
 }
 
 func (s *RealServer)GetHeight()(int, *Block, bool){
-    res, e := s.rpc.GetHeight(context.Background(), &pb.Null{})
-    if e!=nil {
-        return -1, nil, false
-    }
-    block, ok := s.GetBlock(res.LeafHash)
-    if ok{
-        return int(block.BlockID), block, true
-    }
+	for i:=1; i<=Dat["nservers"].(int); i++{
+		connLock.RLock()
+		status := ConnStatus[i]
+		c := ConnClient[i]
+		connLock.RUnlock()
+		if status==1{
+			res, e := c.GetHeight(context.Background(), &pb.Null{})
+			if e!=nil {
+				continue
+			}
+			block, ok := s.GetBlock(res.LeafHash)
+			if ok{
+				return int(block.BlockID), block, true
+			}
+		}
+	}
     return -1, nil, false
 }
 
 func (s *RealServer)PushBlock(block *Block, success chan bool){
-    json := block.MarshalToString()
+	json := block.MarshalToString()
     hash := block.GetHash()
     go WriteJson(hash, json)
-    //s.rpc.PushBlock(s.ctx, &pb.JsonBlockString{Json:json})
-	//client
-	for i:=1; i<=int(Dat["nservers"]); i++{
-		if i==strconv.Atoi(IDstr){
-			continue
+	for ;;{
+		for i:=1; i<=Dat["nservers"].(int); i++{
+			connLock.RLock()
+			status := ConnStatus[i]
+			c := ConnClient[i]
+			connLock.RUnlock()
+			if status==1{
+				_, err := c.PushBlock(context.Background(), &pb.JsonBlockString{Json:json})
+				if err!=nil{
+					success<-true
+				}
+			}
 		}
-		dat := Dat[strconv.Itoa(i)].(map[string]interface{})
-		address, _ := fmt.Sprintf("%s:%s", dat["ip"], dat["port"]), fmt.Sprintf("%s",dat["dataDir"])
-		conn, err := grpc.Dial(address, grpc.WithInsecure())
-		if err != nil {
-			log.Fatalf("Cannot connect to server: %v", err)
-		}
-		c := pb.NewBlockChainMinerClient(conn)
-		r, err := c.PushBlock(context.Background(), &pb.JsonBlockString{Json:json})
-		if err!=nil{
-			success<-true
-		}
-		conn.Close()
 	}
 }
 
