@@ -61,7 +61,7 @@ var IDstrInt int
 // Main function, RPC server initialization
 func main() {
     //set the hardness
-    HashHardness = 2
+    HashHardness = 5
     InitHash = "0000000000000000000000000000000000000000000000000000000000000000"
 
     //TestDatabase()
