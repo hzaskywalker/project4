@@ -14,6 +14,8 @@ import (
     "fmt"
     "google.golang.org/grpc"
     "google.golang.org/grpc/reflection"
+	"log"
+	"os"
 )
 
 func checkUserID(UserID string)bool{
@@ -132,7 +134,10 @@ func (s *Service) Transfer(in *pb.Transaction) (*pb.BooleanResponse, error) {
 */
 
 func (s *Service) Transfer(in *pb.Transaction) (*pb.BooleanResponse, error) {
-	s.transfer.AddPending(in)
+	ok := s.transfer.AddPending(in)
+	if ok{
+		PushTransaction_client(in)
+	}
 	return &pb.BooleanResponse{Success: true}, nil  //todo
 }
 
@@ -147,8 +152,33 @@ func (s *Service) Verify(in *pb.Transaction) (*pb.VerifyResponse, error) {
 	//todo SUCCEEDED PENDING
 }
 
+func PushTransaction_client(in *pb.Transaction){
+	//client
+	for i:=1; i<=int(Dat["nservers"]); i++{
+		if i==int(IDstr){
+			continue
+		}
+		dat := Dat[i].(map[string]interface{})
+		address, _ := fmt.Sprintf("%s:%s", dat["ip"], dat["port"]), fmt.Sprintf("%s",dat["dataDir"])
+		conn, err := grpc.Dial(address, grpc.WithInsecure())
+		if err != nil {
+			log.Fatalf("Cannot connect to server: %v", err)
+		}
+		c := pb.NewBlockChainMinerClient(conn)
+		r, err := c.PushTransaction(context.Background(), in)
+		if err!=nil{
+			success<-true
+		}
+		conn.Close()
+	}
+	return &pb.Null{}, nil
+}
+
 func (s *Service) PushTransaction(in *pb.Transaction) (*pb.Null, error) {
-	s.transfer.AddPending(in)
+	ok := s.transfer.AddPending(in)
+	if ok{
+		PushTransaction_client(in)
+	}
 	return &pb.Null{}, nil
 }
 
@@ -233,7 +263,25 @@ func (s *RealServer)PushBlock(block *Block, success chan bool){
     json := block.MarshalToString()
     hash := block.GetHash()
     go WriteJson(hash, json)
-    s.rpc.PushBlock(s.ctx, &pb.JsonBlockString{Json:json})
+    //s.rpc.PushBlock(s.ctx, &pb.JsonBlockString{Json:json})
+	//client
+	for i:=1; i<=int(Dat["nservers"]); i++{
+		if i==int(IDstr){
+			continue
+		}
+		dat := Dat[i].(map[string]interface{})
+		address, _ := fmt.Sprintf("%s:%s", dat["ip"], dat["port"]), fmt.Sprintf("%s",dat["dataDir"])
+		conn, err := grpc.Dial(address, grpc.WithInsecure())
+		if err != nil {
+			log.Fatalf("Cannot connect to server: %v", err)
+		}
+		c := pb.NewBlockChainMinerClient(conn)
+		r, err := c.PushBlock(context.Background(), &pb.JsonBlockString{Json:json})
+		if err!=nil{
+			success<-true
+		}
+		conn.Close()
+	}
 }
 
 func (s *RealServer)TRANSFER()*Transaction{

@@ -53,7 +53,8 @@ func (s *server) GetBlock(ctx context.Context, in *pb.GetBlockRequest) (*pb.Json
 
 
 var id=flag.Int("id",1,"Server's ID, 1<=ID<=NServers")
-
+var Dat map[string]interface{}
+var IDstr string
 // Main function, RPC server initialization
 func main() {
     //set the hardness
@@ -66,7 +67,7 @@ func main() {
     return
 
     flag.Parse()
-    IDstr:=fmt.Sprintf("%d",*id)
+    IDstr = fmt.Sprintf("%d",*id)
 
     _=fmt.Sprintf("Server%02d",*id)
     _=hash.GetHashString
@@ -77,12 +78,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	var dat map[string]interface{}
-	err = json.Unmarshal(conf, &dat)
+	err = json.Unmarshal(conf, &Dat)
 	if err != nil {
 		panic(err)
 	}
-	dat = dat[IDstr].(map[string]interface{}) // should be dat[myNum] in the future
+	dat := Dat[IDstr].(map[string]interface{}) // should be dat[myNum] in the future
 	address, _ := fmt.Sprintf("%s:%s", dat["ip"], dat["port"]), fmt.Sprintf("%s",dat["dataDir"])
 	
 
@@ -111,3 +111,6 @@ func main() {
         log.Fatalf("failed to serve: %v", err)
     }
 }
+
+
+

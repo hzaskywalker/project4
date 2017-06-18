@@ -86,11 +86,21 @@ func (T *TransferManager)SetFlag(t *Transaction, flag int){  //flag=0 or 1
 	T.lock.UnLock()
 }
 
-func (T *TransferManager)AddPending(t_ *pb.Transaction){
+func (T *TransferManager)AddPending(t_ *pb.Transaction)bool{
 	t := &Transaction{flag: 2, trans: t_}
+	T.lock.RLock()
+	tmp, ok1 := T.dict[0][t.trans.UUID]
+	tmp, ok2 := T.dict[1][t.trans.UUID]
+	T.lock.UnRLock()
+	
+	if ok1 || ok2{
+		return false
+	}
+	
 	T.pendingLock.Lock()
 	T.dict[2][t.trans.UUID] = t
 	T.pendingLock.UnLock()
+	return true
 }
 
 func (T *TransferManager) UpdateBlockStatus(block *Block, flag int){
@@ -116,10 +126,10 @@ func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result cha
 			T.pendingLock.Lock()
 			T.lock.Lock()
 			for _, t := range T.dict[2]{
-				tmp, ok := T.dict[0][t.trans.UUID]
+				/*tmp, ok := T.dict[0][t.trans.UUID]
 				if ok{
 					continue
-				}
+				}*/
 				t.flag = 1
 				T.dict[1][t.trans.UUID] = t
 			}
@@ -129,11 +139,12 @@ func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result cha
 		}
 		block := MakeNewBlock()
 		mining_total := 0
-		T.lock.Lock()
+		T.lock.RLock()
 		for _, t_ := range T.dict[1]{
 			select {
 				case signal := <- stop:
 					if signal == 1{
+						T.lock.UnRLock()
 						return
 					}
 				default:
@@ -149,10 +160,10 @@ func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result cha
 					}
 			}
 		}
-		T.lock.UnLock()
+		T.lock.UnRLock()
 		if len(block.Transactions)>0{
 			database.Add(block.MinerID, mining_total)
-            <-stop
+            //<-stop
 			return block  //result<-block
 		}
 	}
