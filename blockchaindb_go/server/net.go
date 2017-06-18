@@ -134,11 +134,15 @@ func (s *Service) Transfer(in *pb.Transaction) (*pb.BooleanResponse, error) {
 */
 
 func (s *Service) Transfer(in *pb.Transaction) (*pb.BooleanResponse, error) {
+	if !checkTransaction(in){
+		return &pb.BooleanResponse{Success: false}, nil
+	}
 	ok := s.transfer.AddPending(in)
 	if ok{
 		PushTransaction_client(in)
+		return &pb.BooleanResponse{Success: true}, nil
 	}
-	return &pb.BooleanResponse{Success: true}, nil  //todo
+	return &pb.BooleanResponse{Success: false}, nil  //todo
 }
 
 func (s *Service) Verify(in *pb.Transaction) (*pb.VerifyResponse, error) {
@@ -326,20 +330,20 @@ func (s *RealServer)PushBlock(block *Block, success chan bool){
 	json := block.MarshalToString()
     hash := block.GetHash()
     go WriteJson(hash, json)
-	for ;;{
-		for i:=1; i<=int(Dat["nservers"].(float64)); i++{
-			connLock.RLock()
-			status := ConnStatus[i]
-			c := ConnClient[i]
-			connLock.RUnlock()
-			if status==1{
-				_, err := c.PushBlock(context.Background(), &pb.JsonBlockString{Json:json})
-				if err!=nil{
-					success<-true
-				}
+	//for ;;{
+	for i:=1; i<=int(Dat["nservers"].(float64)); i++{
+		connLock.RLock()
+		status := ConnStatus[i]
+		c := ConnClient[i]
+		connLock.RUnlock()
+		if status==1{
+			_, err := c.PushBlock(context.Background(), &pb.JsonBlockString{Json:json})
+			if err!=nil{
+				success<-true
 			}
 		}
 	}
+	//}
 }
 
 func (s *RealServer)TRANSFER()*Transaction{

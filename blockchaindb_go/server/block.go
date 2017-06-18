@@ -146,7 +146,7 @@ func (b* Block) Solve(stop chan int, solved chan *Block){
             //fmt.Println(b.GetHash())
             b.MyHash = hashVal
             solved <- b
-            <- stop
+            //<- stop
             return
         }
     }

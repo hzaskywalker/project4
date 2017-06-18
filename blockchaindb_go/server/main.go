@@ -24,7 +24,7 @@ type server struct{
 
 // Database Interface 
 func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetResponse, error) {
-	fmt.Println("called Get")
+	//fmt.Println("called Get")
     //return &pb.GetResponse{Value: 1000}, nil
 	return s.s.Get(in)
 }
@@ -60,7 +60,7 @@ var IDstrInt int
 // Main function, RPC server initialization
 func main() {
     //set the hardness
-    HashHardness = 5
+    HashHardness = 2
     InitHash = "0000000000000000000000000000000000000000000000000000000000000000"
 
     //TestDatabase()
@@ -72,7 +72,7 @@ func main() {
     IDstr = fmt.Sprintf("%d",*id)
     IDstrInt = int(*id)
 
-    _=fmt.Sprintf("Server%02d",*id)
+    minerid:=fmt.Sprintf("Server%02d",*id)
     _=hash.GetHashString
     
 
@@ -102,13 +102,14 @@ func main() {
 	for i:=1; i<=int(Dat["nservers"].(float64));i++{
 		ConnStatus[i] = 0
 	}
-	go CheckServer()
+	//go CheckServer()
     // Create gRPC server
 	grpc_s := grpc.NewServer()
 	s := &server{}
 	s.s = NewService()
 	q := RealServer{}  //rpc:s
 	miner := NewMiner(&q)
+	miner.MinerID = minerid
 	s.s.transfer = miner.transfers
     pb.RegisterBlockChainMinerServer(grpc_s, s)
     // Register reflection service on gRPC server.

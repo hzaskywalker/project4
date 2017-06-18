@@ -167,6 +167,8 @@ func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result cha
 		if len(block.Transactions)>0{
 			database.Add(block.MinerID, mining_total)
             result <- block
+			//<- stop
+			return
 		}
 	}
 }

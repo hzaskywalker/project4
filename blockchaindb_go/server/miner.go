@@ -233,9 +233,15 @@ func (m *Miner) Init(){
     m.databaseLongest.block = m.longest
 
     var newLongest *Block
-    for ;!ok;{
+    //for ;!ok;{
+	for i:=0;i<10 && !ok;i++{
         _, newLongest, ok = m.ServerGetHeight()
     }
+	if !ok{
+		newLongest = m.longest
+		return
+	}
+	
     e := m.InsertBlock(newLongest)//longest would not be calculated
     if e!=nil{
         fmt.Println(e)
@@ -281,12 +287,12 @@ func (m *Miner) mainLoop(service *Service) error{
     m.Init()
 
     waitBlocks := make(chan *Block, 50)
-    stopSelectTrans := make(chan int)
+    stopSelectTrans := make(chan int, 1)  //should be 1
 
     is_solved := make(chan *Block)
     var stop_solve chan int
 
-    toSolve := make([]*Block, 0)
+    //toSolve := make([]*Block, 0)
     isAdded := make(chan *Block, 50)
 
     database := NewDatabaseEngine(m.databaseLongest)
@@ -298,50 +304,60 @@ func (m *Miner) mainLoop(service *Service) error{
         newBlocks = nil
         //fmt.Println(isAdded, is_solved, waitBlocks, service.GetRequest, service.VerifyRequest, service.PushBlockRequest)
         //fmt.Println(service.GetBlockRequest, service.GetHeightRequest)
-        //fmt.Println("====== main loop =======")
+        fmt.Println("====== main loop =======")
 
         select {
             case addedBlock := <- isAdded:
-                //fmt.Println("getNew")
-                if addedBlock.GetHeight() > m.longest.GetHeight(){
+                fmt.Println("getNew")
+				fmt.Println(addedBlock.GetHeight(), m.longest.GetHeight())
+                if addedBlock.GetHeight() > m.longest.GetHeight() || addedBlock.GetHeight() == m.longest.GetHeight() && addedBlock.GetHash() < m.longest.GetHash(){
                     e := m.VerifyBlock(addedBlock) //It's better to build a verify list
+					fmt.Println("end verify", e)
                     //place where we change the consensus
                     if e == nil{
-                        if true{
-                            if stop_solve != nil{
-                                stop_solve <- 1 //stop solving
-                            }
-                            stopSelectTrans <- 1 //so that pending would release lock
-                        }
+                        //if true{
+						fmt.Println("zxc")
+						if stop_solve != nil{
+							stop_solve <- 1 //stop solving
+							stop_solve = nil
+						}
+						fmt.Println("asd")
+						stopSelectTrans <- 1 //so that pending would release lock
+						fmt.Println("qwe")
+                        //}
 
                         //we need stop other verifier, otherwise their databse would be wrong
                         fmt.Println("Update longest", addedBlock.GetHeight())
                         m.UpdateLongest(addedBlock)
-
+						stopSelectTrans = make(chan int, 1)  //should be 1
                         go m.transfers.GetBlocksByBalance(database, waitBlocks, stopSelectTrans)
                     }
                 }
             case solved := <- is_solved:
                 //fmt.Println("In Solved")
                 newBlocks = solved
-                stop_solve <- 1
-                stop_solve = nil
-                if len(toSolve) > 0{
+				stop_solve = nil
+                //stop_solve <- 1
+                //stop_solve = nil
+                /*if len(toSolve) > 0{
                     stop_solve = make(chan int)
                     go toSolve[0].Solve(stop_solve, is_solved)
                     toSolve = toSolve[1:]
-                }
+                }*/
 
             case block := <- waitBlocks:
                 fmt.Println("In waitBlock")
+				block.PrevHash = m.longest.GetHash()
+				block.BlockID = m.longest.BlockID + 1
+				block.MinerID = m.MinerID
                 //block.MinerID = "xxxx"
-                toSolve = append(toSolve, block)
-                if stop_solve == nil{
-                    stop_solve = make(chan int)
-                    //fmt.Println("start solve")
-                    go block.Solve(stop_solve, is_solved)
-                    toSolve = toSolve[1:]
-                }
+                //toSolve = append(toSolve, block)
+                //if stop_solve == nil{
+				stop_solve = make(chan int, 1)
+				fmt.Println("start solve")
+				go block.Solve(stop_solve, is_solved)
+                    //toSolve = toSolve[1:]
+                //}
             case UserID := <- service.GetRequest:
                 //fmt.Println("In GetRequest")
                 val, _ := m.databaseLongest.Get(UserID)
@@ -355,7 +371,9 @@ func (m *Miner) mainLoop(service *Service) error{
                 newBlocks = PushedBlock
             case GetBlockHash := <- service.GetBlockRequest:
                 //fmt.Println("In GetBlock")
+				m.mapLock.RLock()
                 block, ok := m.hash2block[GetBlockHash]
+				m.mapLock.RUnlock()
                 if !ok{
                     block = nil
                 }
@@ -363,7 +381,7 @@ func (m *Miner) mainLoop(service *Service) error{
             case <-service.GetHeightRequest:
                 //fmt.Println("In GetHeight")
                 service.GetHeightResponse <- m.longest
-            case <- time.After(time.Second):
+            case <- time.After(time.Second * 2):
                 //decide wether to start a new block or any other strategy
                 //or do nothing
             case <- service.Hello:
