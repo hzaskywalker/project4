@@ -155,6 +155,10 @@ func (T *TransferManager)GetBlocksByBalance(database *DatabaseEngine, result cha
 					if int(t.Value) > val{
 						continue
 					}
+					block_, ok := database.GetUUID(t.UUID)
+					if ok && block_!=nil{
+						continue
+					}
 					database.Transfer(t, block, 1)
 					mining_total = mining_total + int(t.MiningFee)
 					block.Transactions = append(block.Transactions, t)

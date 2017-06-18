@@ -220,10 +220,11 @@ func (m *Miner) VerifyBlock(block *Block)error{
 		//fmt.Println("verify func start", block.BlockID)
         m.mapLock.Lock()
         //m.hash2block[block.GetHash()] = nil
-		erase(m.hash2block, block.GetHash())
+		delete(m.hash2block, block.GetHash())
         m.mapLock.Unlock()
 		//fmt.Println("end verify func")
 		fmt.Println("------error------")
+		//os.Exit(1)
         return errors.New("block balance wrong")
     }
 }
