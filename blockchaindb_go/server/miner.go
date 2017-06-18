@@ -93,8 +93,9 @@ func (m *Miner) GetBlock(hash string)(*Block, bool){
 }
 
 func (m *Miner) Findfather(block *Block) (*Block, error){
-	if block.PrevHash == InitHash{
-		return nil, nil
+	//if block.PrevHash == InitHash{
+	if block.BlockID <= 0{
+		return nil, nil  //errors.New("is root")
 	}
     fa, ok := m.GetBlock(block.PrevHash)
     if ok == false || (fa!=nil && fa.BlockID+1!=block.BlockID) || fa == nil{
@@ -197,9 +198,11 @@ func (m *Miner) VerifyBlock(block *Block)error{
     if e == nil{
         return nil
     } else{
+		fmt.Println("verify", block.BlockID)
         m.mapLock.Lock()
         m.hash2block[block.GetHash()] = nil
         m.mapLock.Unlock()
+		fmt.Println("end verify func")
         return errors.New("block balance wrong")
     }
 }
@@ -242,7 +245,7 @@ func (m *Miner) Init(){
         _, newLongest, ok = m.ServerGetHeight()
     }
 	if !ok{
-		newLongest = m.longest
+		//newLongest = m.longest
 		return
 	}
 	
@@ -315,6 +318,7 @@ func (m *Miner) mainLoop(service *Service) error{
                 fmt.Println("getNew")
 				fmt.Println(addedBlock.GetHeight(), m.longest.GetHeight())
                 if addedBlock.GetHeight() > m.longest.GetHeight() || addedBlock.GetHeight() == m.longest.GetHeight() && addedBlock.GetHash() < m.longest.GetHash(){
+					fmt.Println("start verify")
                     e := m.VerifyBlock(addedBlock) //It's better to build a verify list
 					fmt.Println("end verify", e)
                     //place where we change the consensus
@@ -338,7 +342,9 @@ func (m *Miner) mainLoop(service *Service) error{
                         go m.transfers.GetBlocksByBalance(database, waitBlocks, stopSelectTrans)
                     }
                 }
+				fmt.Println("end getNew")
             case solved := <- is_solved:
+				fmt.Println("enter solved")
                 //fmt.Println("In Solved")
                 newBlocks = solved
 				stop_solve = nil
@@ -351,6 +357,7 @@ func (m *Miner) mainLoop(service *Service) error{
                     go toSolve[0].Solve(stop_solve, is_solved)
                     toSolve = toSolve[1:]
                 }*/
+				fmt.Println("end solved")
 
             case block := <- waitBlocks:
                 fmt.Println("In waitBlock")
@@ -367,10 +374,13 @@ func (m *Miner) mainLoop(service *Service) error{
                 //}
             case UserID := <- service.GetRequest:
                 //fmt.Println("In GetRequest")
+				fmt.Println("get3")
                 val, _ := m.databaseLongest.Get(UserID)
+				fmt.Println("get4")
                 service.GetResponse <- val
             case UUID := <- service.VerifyRequest:
                 //m.longest dabase
+				fmt.Println("enter verify")
                 block, ok := m.databaseLongest.GetUUID(UUID)
                 if !ok || block == nil{
                     service.VerifyResponse <- &MyVerifyResponse{t: 3, hash: "?"}
@@ -378,6 +388,10 @@ func (m *Miner) mainLoop(service *Service) error{
                     flag := true
                     t := m.longest
                     for i:=0;i<6;i++{
+						if t == nil{
+							flag = false
+                            break
+						}
                         if t.GetHash() == block.GetHash(){
                             flag = false
                             break
@@ -390,12 +404,16 @@ func (m *Miner) mainLoop(service *Service) error{
                         service.VerifyResponse <- &MyVerifyResponse{t:2, hash:block.GetHash()}
                     }
                 }
+				fmt.Println("end verify")
             case PushedBlock := <- service.PushBlockRequest:
+			fmt.Println("enter PushedBlock")
                 //fmt.Println("In push block")
                 service.PushBlockResponse <- true
                 newBlocks = PushedBlock
+				fmt.Println("end PushedBlock")
             case GetBlockHash := <- service.GetBlockRequest:
                 //fmt.Println("In GetBlock")
+				fmt.Println("enter GetBlockHash")
 				m.mapLock.RLock()
                 block, ok := m.hash2block[GetBlockHash]
 				m.mapLock.RUnlock()
@@ -403,9 +421,12 @@ func (m *Miner) mainLoop(service *Service) error{
                     block = nil
                 }
                 service.GetBlockReponse <- block
+				fmt.Println("end GetBlockHash")
             case <-service.GetHeightRequest:
+				fmt.Println("enter GetHeightRequest")
                 //fmt.Println("In GetHeight")
                 service.GetHeightResponse <- m.longest
+				fmt.Println("end GetHeightRequest")
             case <- time.After(time.Second * 2):
                 //decide wether to start a new block or any other strategy
                 //or do nothing
