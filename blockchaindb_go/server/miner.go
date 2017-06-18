@@ -211,13 +211,10 @@ func (m *Miner) VerifyBlock(block *Block)error{
 		//fmt.Println("verify func start", block.BlockID)
         //m.mapLock.Lock()
         //m.hash2block[block.GetHash()] = nil
-<<<<<<< HEAD
 		//erase(m.hash2block, block.GetHash())
         //m.mapLock.Unlock()
-=======
-		delete(m.hash2block, block.GetHash())
-        m.mapLock.Unlock()
->>>>>>> 3de0bcf3080b523cba8b8a6e2a091b3c7c13194f
+		//delete(m.hash2block, block.GetHash())
+        //m.mapLock.Unlock()
 		//fmt.Println("end verify func")
 		fmt.Println("------error------")
 		fmt.Println(m.databaseLongest.UUID)
@@ -325,6 +322,7 @@ func (m *Miner) mainLoop(service *Service) error{
     isAdded := make(chan *Block, 50)
 
     database := NewDatabaseEngine(m.databaseLongest)
+	waitBlocks = make(chan *Block, 50)
     go m.transfers.GetBlocksByBalance(database, waitBlocks, stopSelectTrans)
 
 
@@ -362,6 +360,7 @@ func (m *Miner) mainLoop(service *Service) error{
                         m.UpdateLongest(addedBlock)
 						stopSelectTrans = make(chan int, 1)  //should be 1
 						database := NewDatabaseEngine(m.databaseLongest)
+						waitBlocks = make(chan *Block, 50)
                         go m.transfers.GetBlocksByBalance(database, waitBlocks, stopSelectTrans)
                     }
                 }
