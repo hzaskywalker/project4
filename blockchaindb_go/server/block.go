@@ -154,10 +154,9 @@ func (b* Block) Solve(stop chan int, solved chan *Block){
 }
 
 func (b *Block) SolveSync()string{
-    stop := make(chan int)
+    stop := make(chan int, 1)
     solved := make(chan *Block)
     go b.Solve(stop, solved)
     <- solved
-    stop <- 1
     return b.MyHash
 }
