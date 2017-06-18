@@ -86,7 +86,7 @@ type Service struct{
     GetResponse chan int
     //TRANSFER //handeled by transfer
     VerifyRequest chan string
-    VerifyResponse chan *Block
+    VerifyResponse chan int
     //PushTransaction 
     GetHeightRequest chan bool
     GetHeightResponse chan *Block
