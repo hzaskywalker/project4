@@ -369,9 +369,27 @@ func (m *Miner) mainLoop(service *Service) error{
                 //fmt.Println("In GetRequest")
                 val, _ := m.databaseLongest.Get(UserID)
                 service.GetResponse <- val
-            case _ = <- service.VerifyRequest:
-                //fmt.Println("In verify")
-                //I don't know how to do it
+            case UUID := <- service.VerifyRequest:
+                //m.longest dabase
+                block, ok := m.databaseLongest.GetUUID(UUID)
+                if !ok || block == nil{
+                    VerifyResponse <- 3
+                } else{
+                    flag := true
+                    t := m.longest
+                    for i:=0;i<6;i++{
+                        if t.GetHash() == block.GetHash(){
+                            flag = false
+                            break
+                        }
+                        t, _ := m.Findfather(t)
+                    }
+                    if true{
+                        VerifyResponse <- 1
+                    } else{
+                        VerifyResponse <- 2
+                    }
+                }
             case PushedBlock := <- service.PushBlockRequest:
                 //fmt.Println("In push block")
                 service.PushBlockResponse <- true
