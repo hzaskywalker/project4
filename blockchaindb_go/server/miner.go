@@ -375,6 +375,7 @@ func (m *Miner) mainLoop(service *Service) error{
 
                 m.InsertBlock(newBlocks)
                 fmt.Println(m.longest.BlockID, solved.BlockID, solved.PrevHash==m.longest.GetHash())
+                /*
                 if m.VerifyBlock(m.longest)!=nil{
                     //fmt.Println("errors2")
                     //os.Exit(0)
@@ -383,6 +384,7 @@ func (m *Miner) mainLoop(service *Service) error{
                     //fmt.Println("errors3")
                     //os.Exit(0)
                 }
+                */
                 //newBlocks = nil
                 //stop_solve <- 1
                 //stop_solve = nil

@@ -17,7 +17,7 @@ Question:
 
 import (
     pb "../protobuf/go"
-    "os"
+    //"os"
     "fmt"
 )
 
@@ -73,7 +73,7 @@ func (db *DatabaseEngine)Transfer2(from string, to string, value int, value2 int
     }
     db.Add(from, value)
     db.Add(to, -value2)
-    fmt.Println(db.Get(from))
+    //fmt.Println(db.Get(from))
     return false
 }
 
@@ -96,9 +96,11 @@ func (db *DatabaseEngine)Transfer(t *pb.Transaction, block *Block, flag int)bool
     if flag >0 {
         b, ok := db.GetUUID(UUID)
         if ok && b!=nil{
+            /*
             fmt.Println("Invalid UUID", block.BlockID)
             fmt.Println(block, db.block.BlockID)
             os.Exit(1)
+            */
             return false
         }
     }
@@ -129,9 +131,9 @@ func (db *DatabaseEngine)Get(userId string)(int, bool){
 }
 
 func (db *DatabaseEngine)UpdateBalance(block *Block, flag int)bool{
-    fmt.Println(flag)
+    //fmt.Println(flag)
     //flag is either -1 or 1
-    fmt.Println("UpdataBalance")
+    //fmt.Println("UpdataBalance")
     num := len(block.Transactions)
 
     mining_total := 0

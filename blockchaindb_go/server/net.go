@@ -132,9 +132,9 @@ func (s *Service) Get(q *pb.GetRequest) (*pb.GetResponse, error) {
     if !checkUserID(q.UserID){
         return &pb.GetResponse{Value: -1}, nil
     }
-	fmt.Println("get1")
+	//fmt.Println("get1")
     s.GetRequest <- q.UserID
-	fmt.Println("get2")
+	//fmt.Println("get2")
     return &pb.GetResponse{Value: int32(<-s.GetResponse)}, nil
 }
 
